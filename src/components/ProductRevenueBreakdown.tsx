@@ -19,7 +19,7 @@ export default function ProductRevenueBreakdown({
   const data = visible.length > 0 ? visible : filtered;
 
   return (
-    <div className="card-lg h-full">
+    <div className="panel p-5 h-full">
       <div className="mb-3">
         <div className="text-sm font-semibold">Receita por categoria</div>
         <div className="text-xs text-white/50">Faturado x Meta de cada categoria de produto</div>

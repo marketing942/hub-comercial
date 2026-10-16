@@ -15,7 +15,7 @@ export default function UniciveCategoriasBreakdown({ rows }: { rows: ProductBrea
   const totalPct = totalMetaQtd > 0 ? (totalQtd / totalMetaQtd) * 100 : 0;
 
   return (
-    <div className="card-lg h-full flex flex-col">
+    <div className="panel p-5 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3 gap-2">
         <div>
           <div className="text-sm font-semibold flex items-center gap-2">

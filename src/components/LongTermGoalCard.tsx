@@ -40,7 +40,7 @@ export default function LongTermGoalCard({
 
   return (
     <section
-      className="card-lg relative overflow-hidden"
+      className="panel p-4 relative overflow-hidden"
       style={{ borderColor: accent + "55" }}
     >
       <div

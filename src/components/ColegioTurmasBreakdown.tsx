@@ -16,7 +16,7 @@ export default function ColegioTurmasBreakdown({ rows }: { rows: ProductBreakdow
   const totalPct = totalMeta > 0 ? (totalReal / totalMeta) * 100 : 0;
 
   return (
-    <div className="card-lg">
+    <div className="panel p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="text-sm font-semibold flex items-center gap-2">

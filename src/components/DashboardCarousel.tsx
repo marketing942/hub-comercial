@@ -102,35 +102,44 @@ export default function DashboardCarousel({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="inline-flex p-1 rounded-xl bg-panel border border-border">
+    <div className="space-y-5">
+      {/* Barra de contexto: abas das BUs (sublinhado) + periodo e acoes */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 border-b border-[var(--hair)]">
+        <div className="flex items-end gap-1 overflow-x-auto">
           {slides.map((s, i) => {
             const active = i === idx;
             return (
               <button
                 key={s.key}
                 onClick={() => jump(i)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-2 ${
-                  active ? "bg-accent text-black" : "text-white/60 hover:text-white"
+                className={`relative px-4 pt-2 pb-3 font-ui font-bold uppercase tracking-[0.14em] text-[13px] whitespace-nowrap transition ${
+                  active ? "text-accent" : "text-white/50 hover:text-white"
                 }`}
               >
                 {s.label}
-                {active && !paused && slides.length > 1 && (
-                  <span className="text-[10px] opacity-70">{countdown}s</span>
-                )}
+                {/* barra de tempo ate a proxima aba */}
+                <span className="absolute left-3 right-3 bottom-0 h-[2px] rounded-full bg-white/10 overflow-hidden">
+                  {active && (
+                    <span
+                      className="block h-full bg-accent"
+                      style={{
+                        width: paused || slides.length < 2 ? "100%" : `${(countdown / intervalSec) * 100}%`,
+                        transition: "width 1s linear",
+                      }}
+                    />
+                  )}
+                </span>
               </button>
             );
           })}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap pb-2">
           {periodNav}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-panel border border-border text-xs">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs">
             <span className="w-2 h-2 rounded-full bg-accent pulse-dot" />
-            <span className="text-white/60">Atualizado em</span>
-            <span className="font-semibold text-accent">{now}</span>
+            <span className="text-white/50">Atualizado</span>
+            <span className="font-semibold text-accent tabular-nums">{now}</span>
           </div>
           {slides.length > 1 && (
             <button
