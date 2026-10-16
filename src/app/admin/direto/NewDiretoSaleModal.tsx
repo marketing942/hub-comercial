@@ -181,7 +181,7 @@ export default function NewDiretoSaleModal({
                       channel === "direto" ? "border-accent bg-accent/10" : "border-border bg-panel2 hover:border-accent/40"
                     }`}
                   >
-                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#7dd3fc" }}>
+                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#74aee0" }}>
                       <Globe className="w-3.5 h-3.5" /> Direto (site)
                     </div>
                     <div className="text-[11px] text-white/60 mt-0.5 leading-snug">
@@ -195,7 +195,7 @@ export default function NewDiretoSaleModal({
                       channel === "ia" ? "border-accent bg-accent/10" : "border-border bg-panel2 hover:border-accent/40"
                     }`}
                   >
-                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#a78bfa" }}>
+                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#b99be0" }}>
                       <Bot className="w-3.5 h-3.5" /> IA (atendimento)
                     </div>
                     <div className="text-[11px] text-white/60 mt-0.5 leading-snug">

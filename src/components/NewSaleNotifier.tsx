@@ -128,8 +128,8 @@ function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     <div
       className="pointer-events-auto w-[320px] rounded-2xl shadow-glow border overflow-hidden animate-in slide-in-from-right duration-200 cursor-pointer"
       style={{
-        background: "linear-gradient(135deg, rgba(34,197,94,0.22), rgba(10,25,32,0.95))",
-        borderColor: "rgba(34,197,94,0.5)",
+        background: "linear-gradient(135deg, rgba(175,146,86,0.28), rgba(17,17,21,0.97))",
+        borderColor: "rgba(175,146,86,0.55)",
       }}
       onClick={onClose}
       role="button"

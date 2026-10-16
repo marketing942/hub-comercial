@@ -2,7 +2,6 @@ import type { LigacaoRow } from "@/lib/data";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
 import { LIGACAO_STATUSES, ligacaoLabel, ligacaoColor } from "@/lib/products";
 import ProgressBar from "@/components/ProgressBar";
-import { Phone, PhoneOff } from "lucide-react";
 
 export default function LigacaoBreakdown({
   rows,
@@ -28,7 +27,7 @@ export default function LigacaoBreakdown({
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <div>
           <div className="text-sm font-semibold flex items-center gap-2">
-            <Phone className="w-4 h-4 text-accent" /> {title}
+            {title}
           </div>
           <div className="text-xs text-white/50">
             {hint || "Origem das vendas lancadas pelos vendedores no mes"}
@@ -53,13 +52,13 @@ export default function LigacaoBreakdown({
           return (
             <div key={r.status} className="rounded-xl bg-panel2 p-4 relative overflow-hidden">
               <div
-                className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-20 blur-2xl"
-                style={{ background: def.color }}
+                className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-[0.14] blur-2xl"
+                style={{ background: "#c9ae7a" }}
               />
               <div className="relative">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <div className="chip" style={{ background: def.color + "22", color: def.color }}>
-                    {isNada ? <PhoneOff className="w-3 h-3" /> : <Phone className="w-3 h-3" />}{" "}
+                    
                     {def.short}
                   </div>
                   <div className="text-[11px] text-white/40">{fmtPct(pct)}</div>

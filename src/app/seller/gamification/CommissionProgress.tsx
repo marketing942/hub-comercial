@@ -35,7 +35,7 @@ export default function CommissionProgress({
     <div className="card-lg h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold flex items-center gap-2">
-          <Rocket className="w-4 h-4" style={{ color }} /> Sua jornada ate o proximo checkpoint
+          Sua jornada ate o proximo checkpoint
         </div>
         <div className="text-xs font-semibold" style={{ color }}>
           {fmtPct(pctMeta)}
@@ -84,7 +84,7 @@ export default function CommissionProgress({
                   className="absolute left-1/2 -translate-x-1/2 mt-2 text-center whitespace-nowrap"
                   style={{ top: 16 }}
                 >
-                  <div className="text-[10px] font-semibold" style={{ color: reached ? color : "#94a3b8" }}>
+                  <div className="text-[10px] font-semibold" style={{ color: reached ? color : "#ada99b" }}>
                     {t.meta_pct}%
                   </div>
                   <div className="text-[9px] text-white/40 leading-tight">
@@ -141,7 +141,7 @@ export default function CommissionProgress({
         <MiniStat
           label={nextTier ? `Faltam pra ${nextTier.meta_pct}%` : "Tier maximo"}
           value={nextTier ? BRL.format(toNextTier) : "🏆"}
-          highlightColor={nextTier ? color : "#22c55e"}
+          highlightColor={nextTier ? color : "#5fd08f"}
         />
       </div>
     </div>

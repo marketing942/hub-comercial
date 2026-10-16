@@ -2,11 +2,10 @@ import type { ProductBreakdownRow } from "@/lib/data";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
 import { COLOR } from "@/lib/brand";
 import ProgressBar from "@/components/ProgressBar";
-import { GraduationCap, Award } from "lucide-react";
 
 const ITEMS = [
-  { id: "matriculas", label: "Matriculas", icon: GraduationCap },
-  { id: "bolsas_unicive", label: "Bolsas", icon: Award },
+  { id: "matriculas", label: "Matriculas" },
+  { id: "bolsas_unicive", label: "Bolsas" },
 ];
 
 export default function UniciveCategoriasBreakdown({ rows }: { rows: ProductBreakdownRow[] }) {
@@ -20,7 +19,7 @@ export default function UniciveCategoriasBreakdown({ rows }: { rows: ProductBrea
       <div className="flex items-center justify-between mb-3 gap-2">
         <div>
           <div className="text-sm font-semibold flex items-center gap-2">
-            <GraduationCap className="w-4 h-4" style={{ color: COLOR.info }} /> Matriculas x Bolsas
+            Matriculas x Bolsas
           </div>
           <div className="text-xs text-white/50">Avanco em quantidade e faturamento por categoria</div>
         </div>
@@ -45,16 +44,13 @@ export default function UniciveCategoriasBreakdown({ rows }: { rows: ProductBrea
           const pctQ = meta > 0 ? (qtd / meta) * 100 : 0;
           const pctV = valorMeta > 0 ? (valor / valorMeta) * 100 : 0;
           const toneQ = meta <= 0 ? COLOR.neutral : pctQ >= 100 ? COLOR.ok : COLOR.neutral;
-          const barToneQ = meta <= 0 ? COLOR.neutral : pctQ >= 100 ? COLOR.ok : COLOR.info;
+          const barToneQ = meta <= 0 ? COLOR.neutral : pctQ >= 100 ? COLOR.ok : COLOR.gold;
           const toneV = valorMeta <= 0 ? COLOR.neutral : pctV >= 100 ? COLOR.ok : COLOR.neutral;
-          const barToneV = valorMeta <= 0 ? COLOR.neutral : pctV >= 100 ? COLOR.ok : COLOR.info;
-          const Icon = i.icon;
+          const barToneV = valorMeta <= 0 ? COLOR.neutral : pctV >= 100 ? COLOR.ok : COLOR.gold;
           return (
             <div key={i.id} className="rounded-xl bg-panel2/60 p-3">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Icon className="w-4 h-4" style={{ color: COLOR.info }} /> {i.label}
-                </div>
+                <div className="text-sm font-semibold">{i.label}</div>
                 <div className="text-[10px] uppercase tracking-wider text-white/40">
                   Quantidade / Faturamento
                 </div>

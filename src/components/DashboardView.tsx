@@ -8,15 +8,7 @@ import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
 import ColegioTurmasBreakdown from "@/components/ColegioTurmasBreakdown";
 import UniciveCategoriasBreakdown from "@/components/UniciveCategoriasBreakdown";
 import LongTermGoalCard from "@/components/LongTermGoalCard";
-import {
-  Flame,
-  Target,
-  TrendingUp,
-  Wallet,
-  Users,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react";
+import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 
 export default function DashboardView({
@@ -133,7 +125,6 @@ export default function DashboardView({
             <BigStatCard
               label="Matriculas"
               value={`${fmtInt.format(t.qtd)} / ${fmtInt.format(t.meta)}`}
-              icon={<TrendingUp />}
               accent={COLOR.info}
               valueColor={COLOR.neutral}
               progressPct={pct}
@@ -158,7 +149,6 @@ export default function DashboardView({
             <BigStatCard
               label="Faturamento"
               value={`${BRL.format(t.valor)} / ${BRL.format(t.metaValor)}`}
-              icon={<Wallet />}
               accent={COLOR.info}
               valueColor={COLOR.neutral}
               progressPct={pctFat}
@@ -183,7 +173,6 @@ export default function DashboardView({
             <BigStatCard
               label="% da Meta"
               value={fmtPct(pct)}
-              icon={<TrendingUp />}
               accent={pctTone}
               valueColor={pctTone}
             />
@@ -237,7 +226,6 @@ export default function DashboardView({
             <BigStatCard
               label="Total Vendido"
               value={BRL.format(t.valor)}
-              icon={<Wallet />}
               accent={COLOR.info}
               valueColor={COLOR.neutral}
               progressPct={pct}
@@ -262,14 +250,12 @@ export default function DashboardView({
             <BigStatCard
               label="Meta do Mes"
               value={BRL.format(t.meta)}
-              icon={<Target />}
               accent={COLOR.info}
               valueColor={COLOR.neutral}
             />
             <BigStatCard
               label="% da Meta"
               value={fmtPct(pct)}
-              icon={<TrendingUp />}
               accent={pctTone}
               valueColor={pctTone}
             />
@@ -299,22 +285,20 @@ export default function DashboardView({
       >
         <CompareStatCard
           label="Ticket Medio"
-          icon={<Wallet className="w-4 h-4" />}
           real={BRL.format(t.ticketReal)}
           meta={t.ticketMeta > 0 ? BRL.format(t.ticketMeta) : "—"}
           tone={ticketTone}
+          legend={false}
         />
         <CompareStatCard
           label="Conversao"
-          icon={<Target className="w-4 h-4" />}
           real={fmtPct(taxaConversao)}
           meta={convMetaBU > 0 ? fmtPct(convMetaBU) : "—"}
-          subtitle={`${totalVendas} vendas / ${fmtInt.format(leadsTotal)} leads`}
           tone={convTone}
+          legend={false}
         />
         <CompareStatCard
           label="Leads no Mes"
-          icon={<Users className="w-4 h-4" />}
           real={fmtInt.format(leadsTotal)}
           meta={leadsMeta > 0 ? fmtInt.format(leadsMeta) : "—"}
           tone={leadsTone}
@@ -364,7 +348,6 @@ export default function DashboardView({
           <BigStatCard
             label="Matriculas (Real / Meta)"
             value={`${fmtInt.format(t.qtd)} / ${fmtInt.format(t.metaQtd)}`}
-            icon={<TrendingUp />}
             accent={COLOR.info}
             valueColor={COLOR.neutral}
             progressPct={t.metaQtd > 0 ? (t.qtd / t.metaQtd) * 100 : 0}
@@ -466,6 +449,7 @@ export default function DashboardView({
           rightUnit="percent"
           rightPercentScale
           showIdealReference
+          today={day}
           series={[
             {
               key: isQtd ? "qtd" : "valor",
@@ -494,7 +478,7 @@ export default function DashboardView({
             {
               key: "idealPct",
               label: "% Ideal",
-              color: "#facc15",
+              color: "#f0b44c",
               axis: "right",
               unit: "percent",
               dashed: true,
@@ -542,32 +526,24 @@ function buildUnifiedRows(
 
 function CompareStatCard({
   label,
-  icon,
   real,
   meta,
   tone,
   subtitle,
   footer,
+  legend = true,
 }: {
   label: string;
-  icon?: React.ReactNode;
   real: string;
   meta: string;
   tone: string;
   subtitle?: string;
   footer?: React.ReactNode;
+  legend?: boolean;
 }) {
   return (
     <div className="card-lg">
-      <div className="flex items-center justify-between">
-        <div className="kpi-label leading-tight">{label}</div>
-        <div
-          className="w-6 h-6 rounded-md grid place-items-center"
-          style={{ background: tone + "22", color: tone }}
-        >
-          {icon}
-        </div>
-      </div>
+      <div className="kpi-label leading-tight">{label}</div>
       <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
         <span className="big-num leading-none" style={{ color: tone }}>
           {real}
@@ -575,9 +551,11 @@ function CompareStatCard({
         <span className="text-white/30 text-base xl:text-lg font-bold">/</span>
         <span className="text-base xl:text-lg font-bold text-white/40">{meta}</span>
       </div>
-      <div className="text-[10px] text-white/40 mt-1 uppercase tracking-wider leading-tight">
-        real / meta{subtitle ? ` · ${subtitle}` : ""}
-      </div>
+      {legend && (
+        <div className="text-[10px] text-white/40 mt-1 uppercase tracking-wider leading-tight">
+          real / meta{subtitle ? ` · ${subtitle}` : ""}
+        </div>
+      )}
       {footer}
     </div>
   );
@@ -612,19 +590,11 @@ function MetaDoDiaCard({
   return (
     <div className="card-lg card-hover relative overflow-hidden">
       <div
-        className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-25 blur-3xl pointer-events-none"
-        style={{ background: placarColor }}
+        className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-[0.14] blur-3xl pointer-events-none"
+        style={{ background: "#c9ae7a" }}
       />
       <div className="relative flex flex-col gap-1">
-        <div className="flex items-center justify-between">
-          <div className="kpi-label leading-tight">{labelOverride || "Meta do Dia"}</div>
-          <div
-            className="w-6 h-6 rounded-md grid place-items-center"
-            style={{ background: placarColor + "22", color: placarColor }}
-          >
-            <Flame className="w-3.5 h-3.5" />
-          </div>
-        </div>
+        <div className="kpi-label leading-tight">{labelOverride || "Meta do Dia"}</div>
         <div className="big-num leading-none" style={{ color: COLOR.warning }}>
           {metaDia}
         </div>
@@ -637,20 +607,6 @@ function MetaDoDiaCard({
             value={vencendo || empate || semMeta ? (isQtd ? "0" : "R$ 0,00") : falta}
             tone={vencendo || empate || semMeta ? COLOR.ok : COLOR.danger}
           />
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-semibold leading-tight" style={{ color: placarColor }}>
-            {placarLabel}
-          </span>
-          {!semMeta && !empate && (
-            <span
-              className="chip"
-              style={{ background: placarColor + "22", color: placarColor }}
-            >
-              <Arrow className="w-3 h-3" />
-              {vencendo ? `+${diff}` : `-${diff}`}
-            </span>
-          )}
         </div>
       </div>
     </div>
@@ -736,15 +692,7 @@ function MetaDaSemanaCard({
   if (!weekActive || weekTarget <= 0) {
     return (
       <div className="card-lg">
-        <div className="flex items-center justify-between">
-          <div className="kpi-label leading-tight">{labelOverride || "Meta da Semana"}</div>
-          <div
-            className="w-6 h-6 rounded-md grid place-items-center"
-            style={{ background: COLOR.mute + "22", color: COLOR.mute }}
-          >
-            <Flame className="w-3.5 h-3.5" />
-          </div>
-        </div>
+        <div className="kpi-label leading-tight">{labelOverride || "Meta da Semana"}</div>
         <div className="big-num text-white/40 leading-none">—</div>
         <div className="text-[10px] text-white/40 mt-1 uppercase tracking-wider">
           {!weekActive ? "Disponivel no mes atual" : "Sem meta definida"}
@@ -756,32 +704,17 @@ function MetaDaSemanaCard({
   const pct = weekTarget > 0 ? (weekReal / weekTarget) * 100 : 0;
   const batida = weekReal >= weekTarget;
   const tone = batida ? COLOR.ok : COLOR.warning;
-  const label = batida
-    ? "Semana fechada"
-    : `Fechar ate domingo (${String(weekEndDay).padStart(2, "0")})`;
 
   return (
     <div className="card-lg relative overflow-hidden">
       <div
-        className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-25 blur-3xl pointer-events-none"
-        style={{ background: tone }}
+        className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-[0.14] blur-3xl pointer-events-none"
+        style={{ background: "#c9ae7a" }}
       />
       <div className="relative flex flex-col gap-1">
-        <div className="flex items-center justify-between">
-          <div className="kpi-label leading-tight">{labelOverride || "Meta da Semana"}</div>
-          <div
-            className="w-6 h-6 rounded-md grid place-items-center"
-            style={{ background: tone + "22", color: tone }}
-          >
-            <Flame className="w-3.5 h-3.5" />
-          </div>
-        </div>
+        <div className="kpi-label leading-tight">{labelOverride || "Meta da Semana"}</div>
         <div className="big-num leading-none" style={{ color: tone }}>
           {fmtMeta(weekRemaining)}
-        </div>
-        <div className="text-[9px] text-white/40 uppercase tracking-wider leading-tight">
-          Falta na semana ({String(weekStartDay).padStart(2, "0")} a{" "}
-          {String(weekEndDay).padStart(2, "0")})
         </div>
         <div className="grid grid-cols-3 gap-1">
           <Mini label="Semana" value={fmtMeta(weekTarget)} tone={COLOR.warning} />
@@ -791,9 +724,6 @@ function MetaDaSemanaCard({
             value={batida ? (isQtd ? "0" : "R$ 0,00") : fmtMeta(weekRemaining)}
             tone={batida ? COLOR.ok : COLOR.danger}
           />
-        </div>
-        <div className="text-[10px] font-semibold leading-tight" style={{ color: tone }}>
-          {label}
         </div>
       </div>
     </div>

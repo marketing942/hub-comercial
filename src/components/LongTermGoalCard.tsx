@@ -2,13 +2,13 @@ import type { LongTermProgress } from "@/lib/longTerm";
 import { fmtInt, fmtPct } from "@/lib/calc";
 import { COLOR } from "@/lib/brand";
 import ProgressBar from "@/components/ProgressBar";
-import { GraduationCap, ArrowUpRight, ArrowDownRight, TrendingUp, Target } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, TrendingUp, Target } from "lucide-react";
 
 const MONTHS_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
 export default function LongTermGoalCard({
   progress,
-  accent = "#8b5cf6",
+  accent = "#c9ae7a",
 }: {
   progress: LongTermProgress;
   accent?: string;
@@ -45,19 +45,18 @@ export default function LongTermGoalCard({
     >
       <div
         aria-hidden
-        className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-25 pointer-events-none"
-        style={{ background: accent }}
+        className="absolute -top-20 -right-20 w-64 h-64 rounded-full blur-3xl opacity-[0.14] pointer-events-none"
+        style={{ background: "#c9ae7a" }}
       />
       <div className="relative flex flex-col xl:flex-row xl:items-center gap-4">
         {/* Coluna 1: label + numero grande */}
         <div className="xl:flex-1 min-w-0">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/60">
-            <GraduationCap className="w-3.5 h-3.5" style={{ color: accent }} />
             <span>{g.label}</span>
             <span className="text-white/30">·</span>
             <span className="text-white/40">{period}</span>
             {progress.periodEnded && (
-              <span className="chip" style={{ background: "#94a3b822", color: "#94a3b8" }}>
+              <span className="chip" style={{ background: "#ada99b22", color: "#ada99b" }}>
                 Encerrada
               </span>
             )}

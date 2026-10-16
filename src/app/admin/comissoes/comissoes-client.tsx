@@ -278,7 +278,7 @@ function BoardView({ board }: { board: Board }) {
           <div className="text-[10px] uppercase tracking-wider text-white/50">
             Bonus podio {board.unlocked ? "destravado" : `destrava aos ${board.unlockedAt.toFixed(0)}%`}
           </div>
-          <div className="text-lg font-bold" style={{ color: board.unlocked ? COLOR.ok : "#94a3b8" }}>
+          <div className="text-lg font-bold" style={{ color: board.unlocked ? COLOR.ok : "#ada99b" }}>
             {board.unlocked ? "SIM" : "Nao ainda"}
           </div>
         </div>

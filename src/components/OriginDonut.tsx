@@ -61,10 +61,10 @@ export default function OriginDonut({
               <Tooltip
                 cursor={false}
                 contentStyle={{
-                  background: "#0c1b13",
-                  border: "1px solid #1f3a2a",
+                  background: "#14141b",
+                  border: "1px solid #3b3524",
                   borderRadius: 10,
-                  color: "#e8efe9",
+                  color: "#e8e4d9",
                   fontSize: 12,
                 }}
                 formatter={(val: any, _name: any, props: any) => [

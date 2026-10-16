@@ -57,7 +57,7 @@ export default async function GamificationPage({
       <div className="card-lg flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/50">
-            <Trophy className="w-4 h-4 text-accent" /> Gamificacao — {BU_LABEL[bu]}
+            Gamificacao — {BU_LABEL[bu]}
           </div>
           <h1 className="text-xl xl:text-2xl font-bold mt-1">
             Comissao ao vivo de {seller.name.split(" ")[0]}
@@ -94,16 +94,16 @@ export default async function GamificationPage({
         >
           <div
             aria-hidden
-            className="absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl opacity-25"
-            style={{ background: color }}
+            className="absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl opacity-[0.14]"
+            style={{ background: "#c9ae7a" }}
           />
           <div className="relative">
             <div className="text-xs uppercase tracking-wider text-white/50 flex items-center gap-1">
-              <Wallet className="w-3.5 h-3.5" /> Comissao estimada do mes
+              Comissao estimada do mes
             </div>
             <div
               className="text-5xl sm:text-6xl font-extrabold mt-2"
-              style={{ color: calc.commissionValue > 0 ? color : "#94a3b8" }}
+              style={{ color: calc.commissionValue > 0 ? color : "#ada99b" }}
             >
               {BRL.format(calc.commissionValue)}
             </div>
@@ -161,7 +161,7 @@ export default async function GamificationPage({
       <section className="card-lg p-0 overflow-hidden">
         <div className="p-4 border-b border-border">
           <div className="text-sm font-semibold flex items-center gap-2">
-            <Award className="w-4 h-4" style={{ color }} /> Tabela de comissao vigente — {BU_LABEL[bu]}
+            Tabela de comissao vigente — {BU_LABEL[bu]}
           </div>
           <div className="text-xs text-white/50 mt-1">
             Comissao {rules.cumulative ? "acumulativa" : "nao acumulativa"}. Liberada a partir de <b>{rules.min_meta_pct}%</b> da meta.
@@ -244,7 +244,6 @@ function PodiumCard({
       style={{ borderColor: buBonus.unlocked ? COLOR.ok + "55" : undefined }}
     >
       <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4" style={{ color: buBonus.unlocked ? COLOR.ok : "#94a3b8" }} />
         <div className="text-sm font-semibold">Bonus do podio — {BU_LABEL[bu]}</div>
       </div>
       <div className="text-xs text-white/60 leading-snug">
@@ -257,7 +256,7 @@ function PodiumCard({
       </div>
       <div className="text-xs text-white/60">
         Coletiva:{" "}
-        <b style={{ color: buBonus.unlocked ? COLOR.ok : "#94a3b8" }}>
+        <b style={{ color: buBonus.unlocked ? COLOR.ok : "#ada99b" }}>
           {fmtPct(buBonus.pctColetivo)}
         </b>
       </div>
@@ -299,7 +298,7 @@ function PodiumChip({
   value: number;
   unlocked: boolean;
 }) {
-  const medals = ["#eab308", "#94a3b8", "#b45309"];
+  const medals = ["#eab308", "#ada99b", "#b45309"];
   return (
     <div
       className={`rounded-xl border p-3 ${

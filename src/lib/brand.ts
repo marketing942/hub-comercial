@@ -24,7 +24,7 @@ export const BU_LOGO: Record<BU, string | null> = {
 // distinta usada nos chips, logos e elementos de identidade — NUNCA
 // nos numeros, que seguem a paleta semantica COLOR.*)
 export const BU_COLOR: Record<BU, string> = {
-  cppem: "#00E63C",         // verde neon CPPEM
+  cppem: "#c9ae7a",         // dourado CPPEM (nova identidade)
   unicive: "#F5C518",       // dourado Unicive
   colegio_cppem: "#5B8FE0", // azul Colegio (derivado do #1E2F5E)
 };
@@ -45,12 +45,13 @@ export const BU_CHIP_CLASS: Record<BU, string> = {
 // Use SEMPRE estas cores semanticas pra valores numericos,
 // nao as cores das BUs (que servem so pra identificacao).
 export const COLOR = {
-  ok: "#22c55e",       // bateu / sucesso
-  warning: "#facc15",  // meta / urgencia
-  danger: "#ef4444",   // atrasado
-  info: "#7dd3fc",     // ticket / conversao / informativo
-  neutral: "#e8efe9",  // texto principal (branco esverdeado)
-  mute: "#94a3b8",     // texto secundario
+  ok: "#5fd08f",       // bateu / sucesso
+  warning: "#f0b44c",  // meta / urgencia
+  danger: "#ee7d73",   // atrasado
+  info: "#74aee0",     // ticket / conversao / informativo
+  gold: "#c9ae7a",     // em andamento (identidade CPPEM)
+  neutral: "#e8e4d9",  // texto principal
+  mute: "#ada99b",     // texto secundario
 };
 
 // Cor estrategica do numero baseada em estado (sucesso / atencao / atraso)
@@ -94,11 +95,11 @@ export const BU_THEME: Record<
   }
 > = {
   cppem: {
-    accent: "#00E63C",
-    accent2: "#C9A84C",
-    bg: "radial-gradient(900px 320px at 15% 0%, rgba(0,230,60,0.16), transparent 60%), radial-gradient(700px 280px at 90% 8%, rgba(201,168,76,0.10), transparent 60%)",
-    headerBg: "linear-gradient(120deg, rgba(0,230,60,0.18), rgba(26,61,43,0.55))",
-    surface: "rgba(13,34,25,0.6)",
+    accent: "#c9ae7a",
+    accent2: "#af9256",
+    bg: "radial-gradient(900px 320px at 15% 0%, rgba(175,146,86,0.18), transparent 60%), radial-gradient(700px 280px at 90% 8%, rgba(240,220,176,0.07), transparent 60%)",
+    headerBg: "linear-gradient(120deg, rgba(175,146,86,0.22), rgba(24,24,30,0.75))",
+    surface: "rgba(24,24,30,0.6)",
   },
   unicive: {
     accent: "#F5C518",

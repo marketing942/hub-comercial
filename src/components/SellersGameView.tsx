@@ -4,18 +4,7 @@ import { BU_COLOR, BU_LABEL, COLOR, PANICO_BADGE } from "@/lib/brand";
 import { isQtdPrimary, ALL_BUS, type BU } from "@/lib/products";
 import ProgressBar from "@/components/ProgressBar";
 import Avatar from "@/components/Avatar";
-import {
-  Crown,
-  Flame,
-  Rocket,
-  Trophy,
-  Clock,
-  Users,
-  Wallet,
-  Target,
-  GraduationCap,
-  ShieldCheck,
-} from "lucide-react";
+import { Crown } from "lucide-react";
 
 type Status = "batido" | "quase" | "andamento" | "atrasado";
 
@@ -28,12 +17,12 @@ function statusFor(pct: number, gap: number): Status {
 
 const STATUS_META: Record<
   Status,
-  { label: string; color: string; bg: string; icon: React.ReactNode }
+  { label: string; color: string; bg: string }
 > = {
-  batido: { label: "BATEU A META", color: COLOR.ok, bg: "rgba(34,197,94,0.18)", icon: <Trophy className="w-3.5 h-3.5" /> },
-  quase: { label: "Quase la!", color: COLOR.warning, bg: "rgba(250,204,21,0.18)", icon: <Flame className="w-3.5 h-3.5" /> },
-  andamento: { label: "Em andamento", color: COLOR.info, bg: "rgba(125,211,252,0.18)", icon: <Rocket className="w-3.5 h-3.5" /> },
-  atrasado: { label: "Recuperar ritmo", color: COLOR.danger, bg: "rgba(239,68,68,0.18)", icon: <Clock className="w-3.5 h-3.5" /> },
+  batido: { label: "BATEU A META", color: COLOR.ok, bg: "rgba(95,208,143,0.18)" },
+  quase: { label: "Quase la!", color: COLOR.warning, bg: "rgba(250,204,21,0.18)" },
+  andamento: { label: "Em andamento", color: COLOR.info, bg: "rgba(125,211,252,0.18)" },
+  atrasado: { label: "Recuperar ritmo", color: COLOR.danger, bg: "rgba(239,68,68,0.18)" },
 };
 
 export default function SellersGameView({
@@ -64,8 +53,8 @@ export default function SellersGameView({
     <div className="space-y-4">
       {/* Header — compacto, so titulo centralizado */}
       <div
-        className="rounded-xl py-2 px-3 border border-white/5 text-center"
-        style={{ background: COLOR.ok + "15" }}
+        className="rounded-xl py-2 px-3 border border-accent/30 text-center"
+        style={{ background: "linear-gradient(120deg, rgba(175,146,86,0.22), rgba(24,24,30,0.75))" }}
       >
         <h2 className="text-lg xl:text-xl font-bold tracking-tight">
           Quadro dos Vendedores
@@ -124,18 +113,12 @@ function CoordinatorBar({ stats }: { stats: SellerStats[] }) {
     >
       <div
         aria-hidden
-        className="absolute -top-16 -right-16 w-56 h-56 rounded-full blur-3xl opacity-25 pointer-events-none"
-        style={{ background: tone }}
+        className="absolute -top-16 -right-16 w-56 h-56 rounded-full blur-3xl opacity-[0.14] pointer-events-none"
+        style={{ background: "#c9ae7a" }}
       />
       <div className="relative">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 min-w-0">
-            <div
-              className="w-9 h-9 rounded-xl grid place-items-center shrink-0"
-              style={{ background: tone + "22", color: tone }}
-            >
-              <ShieldCheck className="w-5 h-5" />
-            </div>
             <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wider text-white/50">
                 Barra do Coordenador
@@ -202,7 +185,7 @@ function BUGroup({
       {sellers.length === 0 ? (
         <div className="card text-sm text-white/60">Nenhum vendedor ativo nesta BU.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
           {sellers.map((s, i) => (
             <SellerCard key={`${s.sellerId}_${s.bu}`} s={s} pos={i + 1} buColor={accent} />
           ))}
@@ -244,161 +227,134 @@ function SellerCard({
 
   return (
     <div
-      className="card card-hover relative overflow-hidden"
-      style={{
-        boxShadow: st === "batido"
-          ? "0 0 0 1px rgba(34,197,94,0.4), 0 12px 40px -12px rgba(34,197,94,0.4)"
-          : undefined,
-      }}
+      className="card card-hover relative overflow-hidden !p-3"
+      style={{ borderColor: st === "batido" ? "rgba(95,208,143,0.45)" : undefined }}
     >
-      {st === "batido" && (
-        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-success/30 blur-3xl pointer-events-none" />
-      )}
-      <div className="relative">
-        <div className="flex items-center gap-3">
-          <div className="relative shrink-0">
-            <Avatar
-              name={s.sellerName}
-              url={s.avatarUrl}
-              color={s.avatarColor || buColor}
-              size={44}
-            />
-            {st === "atrasado" && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={PANICO_BADGE}
-                alt="Bata a meta ou sera abatido"
-                title="Bata a meta ou sera abatido"
-                className="absolute -top-5 -right-6 w-12 h-12 object-contain rotate-[14deg] pointer-events-none select-none"
-                style={{ filter: "drop-shadow(0 2px 6px rgba(239,68,68,0.6))" }}
-              />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded-md font-bold"
-                style={{ background: buColor + "22", color: buColor }}
-              >
-                #{pos}
-              </span>
-              <div className="text-sm font-semibold truncate">{s.sellerName}</div>
-            </div>
-            <div className="mt-1">
-              <span className="chip" style={{ background: meta.bg, color: meta.color }}>
-                {meta.icon} {meta.label}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-end justify-between gap-2 mt-3">
-          <div>
-            <div className="text-2xl xl:text-3xl font-bold leading-none" style={{ color: meta.color }}>
-              {fmtPct(s.pctSucesso)}
-            </div>
-            <div className="text-[11px] text-white/50 mt-0.5">da meta</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-white/40">
-              {isQtd ? "Matriculas" : "Faturamento"}
-            </div>
-            <div className="text-base font-semibold text-white">
-              {fmtPrincipal(s.realizado)}
-              <span className="text-xs text-white/40 font-normal">
-                {" / "}{fmtPrincipal(s.metaTotal)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-2">
-          <ProgressBar value={s.pctSucesso} color={meta.color} height={7} />
-        </div>
-
-        {/* Mini stats — Unicive tem 4 (adiciona Matriculas), o resto tem 3 */}
-        <div
-          className={`grid gap-2 mt-3 ${
-            s.bu === "unicive" ? "grid-cols-4" : "grid-cols-3"
-          }`}
-        >
-          <CompareStat
-            label="Ticket"
-            icon={<Wallet className="w-3 h-3" />}
-            real={BRL.format(s.ticketReal)}
-            meta={s.ticketMeta > 0 ? BRL.format(s.ticketMeta) : "—"}
-            tone={ticketTone}
+      {/* 1) Identificacao: avatar, posicao + nome, status */}
+      <div className="flex items-center gap-2.5">
+        <div className="relative shrink-0">
+          <Avatar
+            name={s.sellerName}
+            url={s.avatarUrl}
+            color={s.avatarColor || buColor}
+            size={36}
           />
-          <CompareStat
-            label="Conversao"
-            icon={<Target className="w-3 h-3" />}
-            real={fmtPct(s.conversaoReal)}
-            meta={s.conversaoMeta > 0 ? fmtPct(s.conversaoMeta) : "—"}
-            tone={convTone}
-          />
-          <SoloStat
-            label="Leads"
-            icon={<Users className="w-3 h-3" />}
-            value={fmtInt.format(s.leads)}
-          />
-          {s.bu === "unicive" && (
-            <SoloStat
-              label="Matriculas"
-              icon={<GraduationCap className="w-3 h-3" />}
-              value={fmtInt.format(s.qtdRealizada)}
+          {st === "atrasado" && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={PANICO_BADGE}
+              alt="Bata a meta ou sera abatido"
+              title="Bata a meta ou sera abatido"
+              className="absolute -top-4 -right-5 w-9 h-9 object-contain rotate-[14deg] pointer-events-none select-none"
+              style={{ filter: "drop-shadow(0 2px 6px rgba(239,68,68,0.6))" }}
             />
           )}
         </div>
+        <div className="flex-1 min-w-0 leading-tight">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0"
+              style={{ background: buColor + "22", color: buColor }}
+            >
+              #{pos}
+            </span>
+            <div className="text-sm font-semibold truncate">{s.sellerName}</div>
+          </div>
+          <span
+            className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wider"
+            style={{ color: meta.color }}
+          >
+            {meta.label}
+          </span>
+        </div>
+      </div>
+
+      {/* 2) Resultado: % da meta e valor realizado / meta na mesma linha */}
+      <div className="mt-3 flex items-end justify-between gap-2">
+        <div className="text-2xl font-display font-bold leading-none" style={{ color: meta.color }}>
+          {fmtPct(s.pctSucesso)}
+        </div>
+        <div className="text-right leading-tight min-w-0">
+          <div className="text-sm font-semibold text-white truncate">{fmtPrincipal(s.realizado)}</div>
+          <div className="text-[10px] text-white/40 truncate">
+            de {fmtPrincipal(s.metaTotal)} {isQtd ? "matriculas" : ""}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2">
+        <ProgressBar value={s.pctSucesso} color={meta.color} height={6} />
+      </div>
+
+      {/* 3) Indicadores: rotulo, valor e meta empilhados (colunas iguais) */}
+      <div
+        className={`grid gap-1.5 mt-3 ${s.bu === "unicive" ? "grid-cols-4" : "grid-cols-3"}`}
+      >
+        <Stat
+          label="Ticket"
+          value={BRL.format(s.ticketReal)}
+          sub={s.ticketMeta > 0 ? `meta ${BRL.format(s.ticketMeta)}` : "sem meta"}
+          tone={ticketTone}
+        />
+        <Stat
+          label="Conversao"
+          value={fmtPct(s.conversaoReal)}
+          sub={s.conversaoMeta > 0 ? `meta ${fmtPct(s.conversaoMeta)}` : "sem meta"}
+          tone={convTone}
+        />
+        <Stat label="Leads" value={fmtInt.format(s.leads)} />
+        {s.bu === "unicive" && <Stat label="Matriculas" value={fmtInt.format(s.qtdRealizada)} />}
       </div>
     </div>
   );
 }
 
-function CompareStat({
+function Stat({
   label,
-  icon,
-  real,
-  meta,
+  value,
+  sub,
   tone,
 }: {
   label: string;
-  icon?: React.ReactNode;
-  real: string;
-  meta: string;
-  tone: string;
+  value: string;
+  sub?: string;
+  tone?: string;
 }) {
   return (
-    <div className="rounded-lg bg-panel2 p-2 leading-tight">
-      <div className="text-[10px] uppercase tracking-wider text-white/50 flex items-center gap-1">
-        {icon} {label}
+    <div className="rounded-lg bg-panel2 px-2 py-1.5 leading-tight min-w-0">
+      <div className="text-[9px] uppercase tracking-wider text-white/45 truncate">{label}</div>
+      <div className="text-xs font-semibold mt-0.5 truncate" style={{ color: tone || COLOR.neutral }}>
+        {value}
       </div>
-      <div className="text-sm font-semibold mt-0.5 whitespace-nowrap">
-        <span style={{ color: tone }}>{real}</span>
-        <span className="text-white/30 mx-1">/</span>
-        <span className="text-white/40 font-normal text-xs">{meta}</span>
-      </div>
+      <div className="text-[9px] text-white/35 mt-0.5 truncate h-[11px]">{sub ?? ""}</div>
     </div>
   );
 }
 
-function SoloStat({
-  label,
-  icon,
-  value,
-}: {
-  label: string;
-  icon?: React.ReactNode;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg bg-panel2 p-2 leading-tight">
-      <div className="text-[10px] uppercase tracking-wider text-white/50 flex items-center gap-1">
-        {icon} {label}
-      </div>
-      <div className="text-sm font-semibold mt-0.5 text-white">{value}</div>
-    </div>
-  );
-}
+// Podio de verdade: 2o | 1o | 3o, com pilares de alturas diferentes. O vendedor
+// fica em cima do pilar (avatar + nome) e os numeros ficam dentro do pilar.
+const PODIUM_STYLE: Record<
+  number,
+  { height: number; fill: string; edge: string; num: string }
+> = {
+  1: {
+    height: 210,
+    fill: "linear-gradient(180deg, rgba(201,174,122,0.55), rgba(175,146,86,0.18))",
+    edge: "#e6cf9f",
+    num: "#f0dcb0",
+  },
+  2: {
+    height: 160,
+    fill: "linear-gradient(180deg, rgba(190,190,205,0.34), rgba(190,190,205,0.08))",
+    edge: "#c4c4d0",
+    num: "#d6d6e0",
+  },
+  3: {
+    height: 128,
+    fill: "linear-gradient(180deg, rgba(190,130,85,0.40), rgba(190,130,85,0.09))",
+    edge: "#c98f5e",
+    num: "#dba978",
+  },
+};
 
 function BUPodium({
   title,
@@ -414,78 +370,82 @@ function BUPodium({
 
   return (
     <div className="card-lg">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm font-semibold flex items-center gap-2" style={{ color: accent }}>
-          <Crown className="w-4 h-4" /> {title}
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm font-semibold font-display uppercase tracking-wide" style={{ color: accent }}>
+          {title}
         </div>
         <div className="text-[11px] text-white/40">{ranking.length} no time</div>
       </div>
       {order.length === 0 ? (
         <div className="text-sm text-white/50 py-6 text-center">Sem vendedores nesta BU ainda.</div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 items-end">
-          {order.map((s) => {
-            const pos = ranking.indexOf(s) + 1;
-            const isFirst = pos === 1;
-            const isQtd = isQtdPrimary(s.bu);
-            const valueStr = isQtd ? fmtInt.format(s.realizado) : BRL.format(s.realizado);
-            const label = isQtd ? "matriculas" : "faturado";
-            const avatarSize = isFirst ? 84 : 64;
-
-            return (
-              <div
-                key={`${s.sellerId}_${s.bu}`}
-                className={`rounded-2xl text-center p-3 ${
-                  isFirst
-                    ? "bg-warning/15 border border-warning/40 shadow-glow"
-                    : "bg-panel2/60"
-                }`}
-                style={{ minHeight: isFirst ? 280 : 220 }}
-              >
-                <div className="flex items-center justify-center gap-1 text-[11px] font-bold mb-2">
-                  <Crown
-                    className={isFirst ? "w-4 h-4" : "w-3.5 h-3.5"}
-                    style={{ color: isFirst ? "#facc15" : pos === 2 ? "#cbd5e1" : "#fb923c" }}
-                  />
-                  {pos}o LUGAR
-                </div>
-                <div className="relative flex justify-center mb-2">
-                  {isFirst && (
-                    <Crown
-                      className="absolute -top-3 left-1/2 -translate-x-1/2 w-7 h-7"
-                      style={{
-                        color: "#facc15",
-                        filter: "drop-shadow(0 2px 6px rgba(250,204,21,0.55))",
-                        transform: "translateX(-50%) rotate(-8deg)",
-                      }}
+        <div>
+          <div className="flex items-end justify-center gap-2 sm:gap-3">
+            {order.map((s) => {
+              const pos = ranking.indexOf(s) + 1;
+              const isFirst = pos === 1;
+              const st = PODIUM_STYLE[pos];
+              const isQtd = isQtdPrimary(s.bu);
+              const valueStr = isQtd ? fmtInt.format(s.realizado) : BRL.format(s.realizado);
+              const label = isQtd ? "matriculas" : "faturado";
+              return (
+                <div key={`${s.sellerId}_${s.bu}`} className="flex-1 min-w-0 max-w-[190px] flex flex-col items-center">
+                  {/* Vendedor em cima do pilar */}
+                  <div className="relative flex justify-center mb-1.5">
+                    {isFirst && (
+                      <Crown
+                        className="absolute -top-5 left-1/2 w-7 h-7"
+                        style={{
+                          color: "#e6cf9f",
+                          filter: "drop-shadow(0 2px 8px rgba(201,174,122,0.6))",
+                          transform: "translateX(-50%) rotate(-8deg)",
+                        }}
+                      />
+                    )}
+                    <Avatar
+                      name={s.sellerName}
+                      url={s.avatarUrl}
+                      color={s.avatarColor || accent}
+                      size={isFirst ? 68 : 54}
                     />
-                  )}
-                  <Avatar
-                    name={s.sellerName}
-                    url={s.avatarUrl}
-                    color={s.avatarColor || accent}
-                    size={avatarSize}
-                  />
+                  </div>
+                  <div
+                    className={`w-full text-center font-semibold truncate mb-2 ${isFirst ? "text-base" : "text-sm"}`}
+                    style={isFirst ? { color: st.num } : undefined}
+                    title={s.sellerName}
+                  >
+                    {s.sellerName}
+                  </div>
+
+                  {/* Pilar com os dados */}
+                  <div
+                    className="w-full rounded-t-xl flex flex-col items-center justify-start px-2 pt-2.5 pb-2 text-center"
+                    style={{
+                      height: st.height,
+                      background: st.fill,
+                      borderTop: `2px solid ${st.edge}`,
+                      boxShadow: isFirst ? "0 -10px 40px -14px rgba(201,174,122,0.55)" : undefined,
+                    }}
+                  >
+                    <div className="font-display font-bold leading-none" style={{ fontSize: isFirst ? 40 : 30, color: st.num }}>
+                      {pos}
+                    </div>
+                    <div className="mt-2 text-sm xl:text-base font-bold text-white truncate max-w-full">
+                      {valueStr}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-white/55">{label}</div>
+                    <div
+                      className="mt-1 text-[11px] font-semibold"
+                      style={{ color: s.pctSucesso >= 100 ? COLOR.ok : COLOR.neutral }}
+                    >
+                      {fmtPct(s.pctSucesso)} da meta
+                    </div>
+                  </div>
                 </div>
-                <div
-                  className={`font-bold truncate ${isFirst ? "text-xl xl:text-2xl" : "text-base xl:text-lg"}`}
-                  style={isFirst ? { color: "#facc15" } : undefined}
-                >
-                  {s.sellerName}
-                </div>
-                <div className="text-sm xl:text-base font-bold mt-1 text-white truncate">
-                  {valueStr}
-                </div>
-                <div className="text-[11px] text-white/50">{label}</div>
-                <div
-                  className="text-[11px] mt-0.5"
-                  style={{ color: s.pctSucesso >= 100 ? COLOR.ok : COLOR.neutral }}
-                >
-                  {fmtPct(s.pctSucesso)} da meta
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          <div className="h-1.5 rounded-b-md bg-white/10" />
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 export default function ProgressBar({
   value,
-  color = "#7c5cff",
+  color = "#c9ae7a",
   height = 10,
 }: {
   value: number;
@@ -9,12 +9,13 @@ export default function ProgressBar({
 }) {
   const v = Math.max(0, Math.min(100, value));
   return (
-    <div className="w-full rounded-full bg-border/60 overflow-hidden" style={{ height }}>
+    <div className="w-full rounded-full bg-white/[0.10] overflow-hidden" style={{ height }}>
       <div
         className="h-full rounded-full"
         style={{
           width: `${v}%`,
-          background: `linear-gradient(90deg, ${color}, ${color}cc)`,
+          background: `linear-gradient(90deg, ${color}99, ${color})`,
+          boxShadow: v > 0 ? `0 0 12px ${color}66` : undefined,
           transition: "width 500ms ease",
         }}
       />

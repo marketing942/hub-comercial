@@ -5,7 +5,6 @@ import { LIGACAO_STATUSES, INDICACAO_STATUSES } from "@/lib/products";
 import BigStatCard from "@/components/BigStatCard";
 import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
 import OriginDonut from "@/components/OriginDonut";
-import { Wallet, Target, MousePointerClick, Globe, Bot } from "lucide-react";
 
 
 export default function DirectDashboardView({
@@ -54,28 +53,24 @@ export default function DirectDashboardView({
         <BigStatCard
           label="Total Vendido (Direto + IA)"
           value={BRL.format(t.valor)}
-          icon={<Wallet />}
           accent={COLOR.info}
           valueColor={COLOR.neutral}
         />
         <BigStatCard
           label="Ticket Medio"
           value={BRL.format(t.ticketReal)}
-          icon={<Wallet />}
           accent={COLOR.info}
           valueColor={COLOR.neutral}
         />
         <BigStatCard
           label="% Conversao (site)"
           value={fmtPct(t.conversao)}
-          icon={<Target />}
           accent={COLOR.info}
           valueColor={COLOR.neutral}
         />
         <BigStatCard
           label="Visitas no Mes (site)"
           value={fmtInt.format(t.visits)}
-          icon={<MousePointerClick />}
           accent={COLOR.info}
           valueColor={COLOR.neutral}
         />
@@ -87,18 +82,16 @@ export default function DirectDashboardView({
           <div className="kpi-label mb-2">Split por canal</div>
           <div className="grid grid-cols-2 gap-2">
             <SplitTile
-              icon={<Globe className="w-4 h-4" />}
               label="Direto (site)"
               valor={t.valorDireto}
               qtd={t.qtdDireto}
-              color="#7dd3fc"
+              color="#74aee0"
             />
             <SplitTile
-              icon={<Bot className="w-4 h-4" />}
               label="IA (atendimento)"
               valor={t.valorIA}
               qtd={t.qtdIA}
-              color="#a78bfa"
+              color="#b99be0"
             />
           </div>
         </div>
@@ -109,7 +102,7 @@ export default function DirectDashboardView({
               label="CPPEM"
               valor={t.valorCppem}
               qtd={t.qtdCppem}
-              color="#22c55e"
+              color="#5fd08f"
             />
             <SplitTile
               label="UNICIVE"
@@ -124,7 +117,7 @@ export default function DirectDashboardView({
       {/* Breakdown CPPEM (direto + IA CPPEM) — abaixo do grafico */}
       <ProductRevenueBreakdown
         rows={snap.breakdown}
-        color="#7dd3fc"
+        color="#74aee0"
       />
 
       {/* Breakdown UNICIVE — so aparece se ha venda IA em UNICIVE */}
@@ -177,7 +170,6 @@ function SplitTile({
   return (
     <div className="rounded-xl bg-panel2 p-3">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/50">
-        {icon}
         <span>{label}</span>
       </div>
       <div className="text-xl xl:text-2xl font-extrabold mt-0.5" style={{ color }}>

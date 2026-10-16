@@ -2,65 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Identidade CPPEM (mesmos tokens da Central de Ajuda). */
 :root {
   color-scheme: dark;
+  --gold: #af9256; --gold-light: #c9ae7a; --gold-pale: #f0dcb0; --gold-dark: #8a7040;
+  --text: #e8e4d9; --text-soft: #ada99b; --text-muted: #87847a;
 }
-html, body { background: #06120a; color: #e8efe9; }
+html, body { background: #0e0e14; color: var(--text); }
 body {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(34,197,94,0.18), transparent 60%),
-    radial-gradient(1000px 500px at -10% 100%, rgba(163,230,53,0.10), transparent 60%),
-    #06120a;
+    radial-gradient(1100px 560px at 88% -5%, rgba(201,174,122,0.12), transparent 62%),
+    radial-gradient(900px 520px at -5% 100%, rgba(201,174,122,0.07), transparent 65%),
+    #0e0e14;
+  background-attachment: fixed;
   min-height: 100vh;
 }
+::selection { background: var(--gold); color: #0e0e14; }
+h1, h2, h3 { font-family: var(--font-display), sans-serif; letter-spacing: -0.01em; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--gold-pale); outline-offset: 2px; }
 
 @layer components {
   .card {
     @apply bg-panel border border-border rounded-2xl p-3;
     background-image:
-      radial-gradient(800px 200px at 0% 0%, rgba(34,197,94,0.06), transparent 60%);
+      radial-gradient(700px 180px at 0% 0%, rgba(201,174,122,0.10), transparent 62%),
+      linear-gradient(150deg, rgba(31,30,39,0.96), rgba(18,18,24,0.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 30px -18px rgba(0,0,0,0.8);
   }
-  .card-hover { @apply transition hover:border-accent/40 hover:shadow-glow; }
+  .card-hover { @apply transition hover:border-accent/60 hover:shadow-glow; }
   .card-lg {
     @apply bg-panel border border-border rounded-2xl p-3;
     background-image:
-      radial-gradient(800px 300px at 0% 0%, rgba(34,197,94,0.08), transparent 60%);
+      radial-gradient(800px 260px at 0% 0%, rgba(201,174,122,0.12), transparent 62%),
+      linear-gradient(150deg, rgba(31,30,39,0.96), rgba(18,18,24,0.96));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 14px 36px -20px rgba(0,0,0,0.85);
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-ui font-bold uppercase tracking-wider text-sm transition;
   }
-  .btn-primary { @apply btn bg-accent text-black hover:opacity-90; }
-  .btn-ghost { @apply btn bg-panel2 text-white hover:bg-border; }
+  .btn-primary {
+    @apply btn text-[#16130c] hover:-translate-y-0.5;
+    background: linear-gradient(150deg, #f0dcb0, #af9256 55%, #8a7040);
+    box-shadow: 0 12px 34px rgba(175,146,86,0.16);
+  }
+  .btn-ghost { @apply btn bg-panel2 text-white border border-border hover:border-accent/50; }
   .btn-danger { @apply btn bg-danger/15 text-danger hover:bg-danger/25; }
   .input {
-    @apply w-full bg-panel2 border border-border rounded-xl px-3 py-2 text-sm
+    @apply w-full bg-panel2 border border-border rounded-lg px-3 py-2 text-sm
            focus:outline-none focus:border-accent placeholder:text-white/30;
   }
-  .label { @apply text-xs uppercase tracking-wide text-white/50 mb-1 block; }
+  .label { @apply font-ui text-xs font-semibold uppercase tracking-[0.14em] text-white/50 mb-1 block; }
   .chip {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-ui text-xs font-bold uppercase tracking-wider;
   }
   .chip-cppem { @apply chip bg-cppem/15 text-cppem; }
   .chip-unicive { @apply chip bg-unicive/15 text-unicive; }
   .chip-colegio { @apply chip bg-colegio/15 text-colegio; }
-  .kpi-num { @apply text-lg font-bold tracking-tight; }
-  .kpi-label { @apply text-[10px] uppercase tracking-wider text-white/50; }
-  .big-num { @apply text-2xl xl:text-3xl font-bold tracking-tight leading-tight; }
+  .kpi-num { @apply font-display text-lg font-bold tracking-tight; }
+  .kpi-label { @apply font-ui text-[11px] font-semibold uppercase tracking-[0.14em] text-white/50; }
+  .big-num { @apply font-display text-2xl xl:text-3xl font-bold tracking-tight leading-tight; }
+}
+
+/* Grade sutil de fundo nos cabeçalhos de página */
+.grid-fade {
+  background-image:
+    linear-gradient(rgba(175,146,86,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(175,146,86,.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 60% 80% at 50% 40%, black, transparent 75%);
 }
 
 .shimmer {
-  background: linear-gradient(90deg, rgba(34,197,94,0.0), rgba(34,197,94,0.25), rgba(34,197,94,0.0));
+  background: linear-gradient(90deg, rgba(175,146,86,0.0), rgba(201,174,122,0.30), rgba(175,146,86,0.0));
   background-size: 200% 100%;
   animation: shimmer 2.5s linear infinite;
 }
 @keyframes shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
 
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.35); }
-  50% { box-shadow: 0 0 0 14px rgba(34,197,94,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,174,122,0.35); }
+  50% { box-shadow: 0 0 0 14px rgba(201,174,122,0); }
 }
 .pulse-dot { animation: pulseGlow 2s ease-out infinite; }
+
+.recharts-tooltip-wrapper { outline: none; }
+@media (prefers-reduced-motion: reduce) { .shimmer, .pulse-dot { animation: none; } }
 
 /* Estilo TV / fullscreen */
 .tv-mode .kpi-num { font-size: 1.25rem; }
@@ -69,8 +96,8 @@ body {
 .tv-mode header.lg\:hidden { display: none !important; }
 .tv-mode main { max-width: 100% !important; padding: 1rem 1.25rem !important; }
 
-/* Scrollbar dark */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #0c1b13; }
-::-webkit-scrollbar-thumb { background: #1f3a2a; border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: #22c55e44; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #14141b; }
+::-webkit-scrollbar-thumb { background: rgba(175,146,86,0.38); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #c9ae7a; }

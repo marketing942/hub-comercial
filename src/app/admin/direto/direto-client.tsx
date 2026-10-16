@@ -111,21 +111,21 @@ export default function DiretoClient({
           label="Faturamento total"
           value={BRL.format(totalValor)}
           hint={`${list.length} venda${list.length === 1 ? "" : "s"} · ${fmtInt.format(totalQtd)} un.`}
-          accent="#22c55e"
+          accent="#c9ae7a"
         />
         <KpiCard
           icon={<Globe className="w-4 h-4" />}
           label="Direto (site)"
           value={BRL.format(totalDireto)}
           hint="CPPEM apenas"
-          accent="#7dd3fc"
+          accent="#74aee0"
         />
         <KpiCard
           icon={<Bot className="w-4 h-4" />}
           label="IA (atendimento)"
           value={BRL.format(totalIA)}
           hint="CPPEM + UNICIVE"
-          accent="#a78bfa"
+          accent="#b99be0"
         />
         <KpiCard
           icon={<MousePointerClick className="w-4 h-4" />}
@@ -299,11 +299,11 @@ function Row({
         <td className="p-3 whitespace-nowrap">{new Date(sale.sale_date + "T00:00").toLocaleDateString("pt-BR")}</td>
         <td className="p-3">
           {isIA ? (
-            <span className="chip" style={{ background: "#a78bfa22", color: "#a78bfa" }}>
+            <span className="chip" style={{ background: "#b99be022", color: "#b99be0" }}>
               <Bot className="w-3 h-3" /> IA
             </span>
           ) : (
-            <span className="chip" style={{ background: "#7dd3fc22", color: "#7dd3fc" }}>
+            <span className="chip" style={{ background: "#74aee022", color: "#74aee0" }}>
               <Globe className="w-3 h-3" /> Direto
             </span>
           )}

@@ -3,7 +3,6 @@ import { fmtInt, fmtPct } from "@/lib/calc";
 import { COLEGIO_MATRICULAS_IDS, productLabel } from "@/lib/products";
 import { COLOR } from "@/lib/brand";
 import ProgressBar from "@/components/ProgressBar";
-import { GraduationCap, Users } from "lucide-react";
 
 export default function ColegioTurmasBreakdown({ rows }: { rows: ProductBreakdownRow[] }) {
   const map = new Map(rows.map((r) => [r.product_line, r]));
@@ -21,7 +20,7 @@ export default function ColegioTurmasBreakdown({ rows }: { rows: ProductBreakdow
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="text-sm font-semibold flex items-center gap-2">
-            <GraduationCap className="w-4 h-4" style={{ color: COLOR.info }} /> Alunos por turma do colegio
+            Alunos por turma do colegio
           </div>
           <div className="text-xs text-white/50">Meta x Realizado em quantidade de alunos por serie</div>
         </div>
@@ -43,12 +42,11 @@ export default function ColegioTurmasBreakdown({ rows }: { rows: ProductBreakdow
           const pct = meta > 0 ? (qtd / meta) * 100 : 0;
           const falta = Math.max(0, meta - qtd);
           const tone = meta <= 0 ? COLOR.neutral : pct >= 100 ? COLOR.ok : COLOR.neutral;
-          const barTone = meta <= 0 ? COLOR.neutral : pct >= 100 ? COLOR.ok : COLOR.info;
+          const barTone = meta <= 0 ? COLOR.neutral : pct >= 100 ? COLOR.ok : COLOR.gold;
           return (
             <div key={t.id} className="rounded-xl bg-panel2 p-3">
               <div className="flex items-center justify-between mb-1">
                 <div className="text-xs text-white/70 truncate">{t.label}</div>
-                <Users className="w-3.5 h-3.5 text-white/40" />
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold" style={{ color: tone }}>

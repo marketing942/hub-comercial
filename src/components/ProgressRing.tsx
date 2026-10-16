@@ -2,8 +2,8 @@ export default function ProgressRing({
   value,
   size = 140,
   stroke = 12,
-  color = "#7c5cff",
-  trackColor = "#222638",
+  color = "#c9ae7a",
+  trackColor = "rgba(255,255,255,0.07)",
   label,
   sub,
 }: {
@@ -33,12 +33,12 @@ export default function ProgressRing({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={off}
-          style={{ transition: "stroke-dashoffset 600ms ease" }}
+          style={{ transition: "stroke-dashoffset 600ms ease", filter: `drop-shadow(0 0 6px ${color}99)` }}
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
         <div>
-          <div className="text-2xl font-bold">{clamped.toFixed(0)}%</div>
+          <div className="font-display text-2xl font-bold">{clamped.toFixed(0)}%</div>
           {label && <div className="text-[10px] uppercase tracking-wider text-white/50">{label}</div>}
           {sub && <div className="text-[11px] text-white/60 mt-0.5">{sub}</div>}
         </div>

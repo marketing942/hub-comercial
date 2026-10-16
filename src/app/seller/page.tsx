@@ -182,7 +182,7 @@ export default async function MyPanel({
       <section className="card">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-semibold flex items-center gap-2">
-            <Target className="w-4 h-4" style={{ color: pctTone }} /> Quanto falta pra minha meta
+            Quanto falta pra minha meta
           </div>
           <div className="text-xs font-semibold" style={{ color: pctTone }}>
             {fmtPct(stats.pctSucesso)}
