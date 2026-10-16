@@ -96,6 +96,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tv-mode header.lg\:hidden { display: none !important; }
 .tv-mode main { max-width: 100% !important; padding: 1rem 1.25rem !important; }
 
+/* Tela cheia em telas baixas (notebook / TV 768p): compacta o vertical pra o
+   grafico aparecer inteiro sem rolar. */
+@media (max-height: 900px) {
+  html.tv-mode { font-size: 14px; }
+  .tv-mode main { padding: 0.5rem 0.75rem !important; }
+  .tv-mode .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.4rem !important; }
+  .tv-mode .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem !important; }
+  .tv-mode .grid.gap-3 { gap: 0.4rem; }
+  .tv-mode .card-lg, .tv-mode .card { padding: 0.45rem 0.65rem; }
+  .tv-mode .big-num { font-size: 1.45rem; }
+  .tv-mode .kpi-label { font-size: 10px; }
+}
+
+@media (max-height: 800px) {
+  html.tv-mode { font-size: 12.5px; }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #14141b; }

@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef, useState } from "react";
 import {
   Area,
   Bar,
@@ -189,6 +190,43 @@ export default function UnifiedDailyChart({
     return out;
   });
 
+  // Em tela cheia (modo TV) o grafico se ajusta a altura da tela, pra aparecer
+  // inteiro sem rolar — mesmo nas BUs com mais cards acima dele.
+  const areaRef = useRef<HTMLDivElement>(null);
+  const [fitHeight, setFitHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const compute = () => {
+      if (!document.documentElement.classList.contains("tv-mode")) {
+        setFitHeight(null);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0) return; // slide escondido no carrossel
+      const topInPage = rect.top + window.scrollY;
+      const available = Math.floor(window.innerHeight - topInPage - 24);
+      setFitHeight(Math.max(170, Math.min(height, available)));
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    document.addEventListener("fullscreenchange", compute);
+    const classWatch = new MutationObserver(compute);
+    classWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    const sizeWatch = new ResizeObserver(compute);
+    sizeWatch.observe(el);
+    sizeWatch.observe(document.body);
+    // O carrossel mostra/esconde as abas sem disparar resize: remede de tempos em tempos.
+    const poll = setInterval(compute, 700);
+    return () => {
+      clearInterval(poll);
+      window.removeEventListener("resize", compute);
+      document.removeEventListener("fullscreenchange", compute);
+      classWatch.disconnect();
+      sizeWatch.disconnect();
+    };
+  }, [height]);
+
   const hasRight = series.some((s) => s.axis === "right" && !s.hidden);
   const todayLabel = todayIdx !== null ? data[todayIdx]?.day : undefined;
   const lastLabel = data[data.length - 1]?.day;
@@ -205,7 +243,7 @@ export default function UnifiedDailyChart({
         {leads && <LegendItem kind="dot" color={leads.color} label={leads.label} />}
       </div>
 
-      <div style={{ height }}>
+      <div ref={areaRef} style={{ height: fitHeight ?? height }}>
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={{ top: 18, left: 0, right: hasRight ? 8 : 0, bottom: 4 }} barCategoryGap="22%">
             <defs>
@@ -267,7 +305,7 @@ export default function UnifiedDailyChart({
 
             {showIdealReference && hasRight && (
               <ReferenceLine y={100} yAxisId="right" stroke={WARN} strokeDasharray="3 4" strokeOpacity={0.5}
-                label={{ value: "META", position: "insideTopRight", fill: WARN, fontSize: 10, fontWeight: 700 }} />
+                label={{ value: "META", position: "insideTopLeft", fill: WARN, fontSize: 10, fontWeight: 700 }} />
             )}
             {todayLabel && (
               <ReferenceLine
