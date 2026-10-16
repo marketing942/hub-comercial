@@ -13,7 +13,7 @@ type Row = { day: string; valor: number; qtd: number; leads?: number };
 
 export default function DailySalesChart({
   data,
-  color = "#22c55e",
+  color = "#c9ae7a",
   field = "valor",
   unit = "currency",
 }: {
@@ -33,10 +33,10 @@ export default function DailySalesChart({
               <stop offset="100%" stopColor={color} stopOpacity={0.45} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#1f3a2a" strokeDasharray="3 4" vertical={false} />
-          <XAxis dataKey="day" stroke="#7d8a83" fontSize={12} tickLine={false} axisLine={false} />
+          <CartesianGrid stroke="#2d2c3a" strokeDasharray="3 4" vertical={false} />
+          <XAxis dataKey="day" stroke="#87847a" fontSize={12} tickLine={false} axisLine={false} />
           <YAxis
-            stroke="#7d8a83"
+            stroke="#87847a"
             fontSize={12}
             tickLine={false}
             axisLine={false}
@@ -47,12 +47,12 @@ export default function DailySalesChart({
             }
           />
           <Tooltip
-            cursor={{ fill: "rgba(34,197,94,0.08)" }}
+            cursor={{ fill: "rgba(175,146,86,0.10)" }}
             contentStyle={{
-              background: "#0c1b13",
-              border: "1px solid #1f3a2a",
+              background: "#14141b",
+              border: "1px solid #3b3524",
               borderRadius: 12,
-              color: "#e8efe9",
+              color: "#e8e4d9",
             }}
             formatter={(val: any) =>
               unit === "currency"
@@ -64,7 +64,12 @@ export default function DailySalesChart({
             }
             labelFormatter={(l) => `Dia ${l}`}
           />
-          <Bar dataKey={field} fill={`url(#${gradId})`} radius={[6, 6, 0, 0]} />
+          <Bar
+            dataKey={field}
+            fill={`url(#${gradId})`}
+            radius={[6, 6, 0, 0]}
+            style={{ filter: `drop-shadow(0 0 8px ${color}55)` }}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

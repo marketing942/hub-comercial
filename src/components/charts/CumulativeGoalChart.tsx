@@ -14,7 +14,7 @@ type Row = { day: string; pct: number; idealPct: number };
 
 export default function CumulativeGoalChart({
   data,
-  color = "#22c55e",
+  color = "#c9ae7a",
 }: {
   data: Row[];
   color?: string;
@@ -25,20 +25,20 @@ export default function CumulativeGoalChart({
         <AreaChart data={data} margin={{ top: 16, left: -8, right: 8, bottom: 0 }}>
           <defs>
             <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={color} stopOpacity={0.45} />
+              <stop offset="0%" stopColor={color} stopOpacity={0.5} />
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#1f3a2a" strokeDasharray="3 4" vertical={false} />
+          <CartesianGrid stroke="#2d2c3a" strokeDasharray="3 4" vertical={false} />
           <XAxis
             dataKey="day"
-            stroke="#7d8a83"
+            stroke="#87847a"
             fontSize={12}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            stroke="#7d8a83"
+            stroke="#87847a"
             fontSize={12}
             tickLine={false}
             axisLine={false}
@@ -48,10 +48,10 @@ export default function CumulativeGoalChart({
           <Tooltip
             cursor={{ stroke: color, strokeOpacity: 0.4 }}
             contentStyle={{
-              background: "#0c1b13",
-              border: "1px solid #1f3a2a",
+              background: "#14141b",
+              border: "1px solid #3b3524",
               borderRadius: 12,
-              color: "#e8efe9",
+              color: "#e8e4d9",
             }}
             formatter={(val: any, name: any) => [
               `${Number(val).toFixed(1)}%`,
@@ -59,11 +59,11 @@ export default function CumulativeGoalChart({
             ]}
             labelFormatter={(l) => `Dia ${l}`}
           />
-          <ReferenceLine y={100} stroke="#facc15" strokeDasharray="4 4" />
+          <ReferenceLine y={100} stroke="#f0b44c" strokeDasharray="4 4" />
           <Area
             type="monotone"
             dataKey="idealPct"
-            stroke="#7d8a83"
+            stroke="#87847a"
             strokeDasharray="4 4"
             fill="transparent"
             strokeWidth={1.5}
@@ -75,8 +75,9 @@ export default function CumulativeGoalChart({
             stroke={color}
             strokeWidth={3}
             fill="url(#areaGrad)"
+            style={{ filter: `drop-shadow(0 0 8px ${color}aa)` }}
             dot={false}
-            activeDot={{ r: 5, stroke: "#06120a", strokeWidth: 2 }}
+            activeDot={{ r: 5, stroke: "#0e0e14", strokeWidth: 2 }}
           />
         </AreaChart>
       </ResponsiveContainer>
