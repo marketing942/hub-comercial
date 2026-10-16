@@ -12,11 +12,9 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="lg:flex">
+    <div>
       <Sidebar role={role} sellerName={sellerName} items={items} />
-      <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6 max-w-[1800px] mx-auto w-full">
-        {children}
-      </main>
+      <main className="mx-auto w-full max-w-[1800px] px-4 sm:px-6 py-5">{children}</main>
     </div>
   );
 }

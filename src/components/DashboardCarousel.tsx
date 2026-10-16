@@ -134,28 +134,29 @@ export default function DashboardCarousel({
           </div>
           {slides.length > 1 && (
             <button
-              className="btn-ghost h-9 px-3 text-xs"
+              className="btn-ghost h-9 w-9 !p-0"
               onClick={() => setPaused((p) => !p)}
               title={paused ? "Retomar rotacao automatica" : "Pausar rotacao"}
+              aria-label={paused ? "Retomar" : "Pausar"}
             >
-              {paused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-              {paused ? "Retomar" : "Pausar"}
+              {paused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
             </button>
           )}
           <button
-            className="btn-ghost h-9 px-3 text-xs"
+            className="btn-ghost h-9 w-9 !p-0"
             onClick={() => router.refresh()}
             title="Atualizar agora"
+            aria-label="Atualizar"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Atualizar
+            <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            className="btn-ghost h-9 px-3 text-xs"
+            className="btn-ghost h-9 w-9 !p-0"
             onClick={toggleFull}
             title={full ? "Sair de tela cheia" : "Tela cheia (TV)"}
+            aria-label="Tela cheia"
           >
-            {full ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            {full ? "Sair tela cheia" : "Tela cheia"}
+            {full ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
       </div>

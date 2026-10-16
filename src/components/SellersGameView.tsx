@@ -1,7 +1,9 @@
 import type { SellerStats } from "@/lib/calc";
+import type { LigacaoRow, IndicacaoRow } from "@/lib/data";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
 import { BU_COLOR, BU_LABEL, COLOR, PANICO_BADGE } from "@/lib/brand";
-import { isQtdPrimary, ALL_BUS, type BU } from "@/lib/products";
+import { isQtdPrimary, ALL_BUS, LIGACAO_STATUSES, INDICACAO_STATUSES, type BU } from "@/lib/products";
+import OriginDonut from "@/components/OriginDonut";
 import ProgressBar from "@/components/ProgressBar";
 import Avatar from "@/components/Avatar";
 import { Crown } from "lucide-react";
@@ -31,12 +33,16 @@ export default function SellersGameView({
   day,
   totalDays,
   daysLeft,
+  ligacao,
+  indicacao,
 }: {
   stats: SellerStats[];
   monthName: string;
   day: number;
   totalDays: number;
   daysLeft: number;
+  ligacao?: LigacaoRow[];
+  indicacao?: IndicacaoRow[];
 }) {
   const sortByReal = (a: SellerStats, b: SellerStats) => b.realizado - a.realizado;
 
@@ -90,6 +96,28 @@ export default function SellersGameView({
       {ALL_BUS.map((bu) => (
         <BUGroup key={bu} bu={bu} sellers={ranks[bu]} accent={BU_COLOR[bu]} />
       ))}
+
+      {/* Ultima secao: origem das vendas (Onvox e Indicacao), agregado de todas as BUs */}
+      {(ligacao || indicacao) && (
+        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {ligacao && (
+            <OriginDonut
+              rows={ligacao}
+              statuses={LIGACAO_STATUSES}
+              title="Origem por Onvox — Geral"
+              subtitle="A ligacao Onvox influenciou a venda? (todas as BUs)"
+            />
+          )}
+          {indicacao && (
+            <OriginDonut
+              rows={indicacao}
+              statuses={INDICACAO_STATUSES}
+              title="Origem por Indicacao — Geral"
+              subtitle="A venda veio de indicacao? (todas as BUs)"
+            />
+          )}
+        </section>
+      )}
     </div>
   );
 }
@@ -171,161 +199,110 @@ function BUGroup({
   sellers: SellerStats[];
   accent: string;
 }) {
+  const isUni = bu === "unicive";
+  const isQtd = isQtdPrimary(bu);
+  // colunas: # | vendedor | progresso | realizado/meta | ticket | conversao | leads [| matriculas]
+  const cols = isUni
+    ? "grid-cols-[2rem_minmax(9rem,1.3fr)_minmax(8rem,1.6fr)_minmax(8rem,1fr)_5.5rem_5.5rem_3.5rem_4.5rem]"
+    : "grid-cols-[2rem_minmax(9rem,1.3fr)_minmax(8rem,1.6fr)_minmax(8rem,1fr)_5.5rem_5.5rem_3.5rem]";
+  const head = "font-ui text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40";
   return (
-    <section>
-      <div className="flex items-center gap-3 mb-3">
-        <div className="px-3 py-1 rounded-full text-xs font-bold" style={{ background: accent + "22", color: accent }}>
+    <section className="panel overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--hair)]">
+        <span className="font-display font-bold uppercase tracking-wide" style={{ color: accent }}>
           {BU_LABEL[bu]}
-        </div>
-        <div className="flex-1 h-px" style={{ background: accent + "33" }} />
-        <div className="text-[11px] text-white/40">
+        </span>
+        <span className="text-[11px] text-white/40">
           {sellers.length} vendedor{sellers.length === 1 ? "" : "es"}
-        </div>
+        </span>
       </div>
       {sellers.length === 0 ? (
-        <div className="card text-sm text-white/60">Nenhum vendedor ativo nesta BU.</div>
+        <div className="px-5 py-4 text-sm text-white/60">Nenhum vendedor ativo nesta BU.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-          {sellers.map((s, i) => (
-            <SellerCard key={`${s.sellerId}_${s.bu}`} s={s} pos={i + 1} buColor={accent} />
-          ))}
+        <div className="overflow-x-auto">
+          <div className="min-w-[760px]">
+            <div className={`grid ${cols} items-center gap-3 px-5 py-2 ${head}`}>
+              <span>#</span>
+              <span>Vendedor</span>
+              <span>Progresso</span>
+              <span className="text-right">{isQtd ? "Matriculas" : "Faturamento"}</span>
+              <span className="text-right">Ticket</span>
+              <span className="text-right">Conversao</span>
+              <span className="text-right">Leads</span>
+              {isUni && <span className="text-right">Matric.</span>}
+            </div>
+            {sellers.map((s, i) => (
+              <SellerRow key={`${s.sellerId}_${s.bu}`} s={s} pos={i + 1} accent={accent} cols={cols} isUni={isUni} />
+            ))}
+          </div>
         </div>
       )}
     </section>
   );
 }
 
-function SellerCard({
+function SellerRow({
   s,
   pos,
-  buColor,
+  accent,
+  cols,
+  isUni,
 }: {
   s: SellerStats;
   pos: number;
-  buColor: string;
+  accent: string;
+  cols: string;
+  isUni: boolean;
 }) {
   const isQtd = isQtdPrimary(s.bu);
-  const fmtPrincipal = (n: number) =>
-    isQtd ? fmtInt.format(Math.round(n)) : BRL.format(n);
+  const fmtP = (n: number) => (isQtd ? fmtInt.format(Math.round(n)) : BRL.format(n));
   const st = statusFor(s.pctSucesso, s.gap);
   const meta = STATUS_META[st];
-
-  // Cores semanticas: verde se bateu, vermelho se nao bateu (e tem meta),
-  // branco se nao ha meta definida.
-  const ticketTone =
-    s.ticketMeta > 0
-      ? s.ticketReal >= s.ticketMeta
-        ? COLOR.ok
-        : COLOR.danger
-      : COLOR.neutral;
-  const convTone =
-    s.conversaoMeta > 0
-      ? s.conversaoReal >= s.conversaoMeta
-        ? COLOR.ok
-        : COLOR.danger
-      : COLOR.neutral;
-
+  const ticketTone = s.ticketMeta > 0 ? (s.ticketReal >= s.ticketMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
+  const convTone = s.conversaoMeta > 0 ? (s.conversaoReal >= s.conversaoMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
   return (
-    <div
-      className="card card-hover relative overflow-hidden !p-3"
-      style={{ borderColor: st === "batido" ? "rgba(95,208,143,0.45)" : undefined }}
-    >
-      {/* 1) Identificacao: avatar, posicao + nome, status */}
-      <div className="flex items-center gap-2.5">
+    <div className={`grid ${cols} items-center gap-3 px-5 py-3 border-t border-[var(--hair)] hover:bg-white/[0.02] transition`}>
+      <span className="font-display font-bold text-white/35">{pos}</span>
+      <div className="flex items-center gap-3 min-w-0">
         <div className="relative shrink-0">
-          <Avatar
-            name={s.sellerName}
-            url={s.avatarUrl}
-            color={s.avatarColor || buColor}
-            size={36}
-          />
+          <Avatar name={s.sellerName} url={s.avatarUrl} color={s.avatarColor || accent} size={34} />
           {st === "atrasado" && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={PANICO_BADGE}
               alt="Bata a meta ou sera abatido"
               title="Bata a meta ou sera abatido"
-              className="absolute -top-4 -right-5 w-9 h-9 object-contain rotate-[14deg] pointer-events-none select-none"
-              style={{ filter: "drop-shadow(0 2px 6px rgba(239,68,68,0.6))" }}
+              className="absolute -top-3 -right-4 w-7 h-7 object-contain rotate-[14deg] pointer-events-none select-none"
             />
           )}
         </div>
-        <div className="flex-1 min-w-0 leading-tight">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0"
-              style={{ background: buColor + "22", color: buColor }}
-            >
-              #{pos}
-            </span>
-            <div className="text-sm font-semibold truncate">{s.sellerName}</div>
-          </div>
-          <span
-            className="mt-1 inline-block text-[10px] font-bold uppercase tracking-wider"
-            style={{ color: meta.color }}
-          >
+        <div className="min-w-0 leading-tight">
+          <div className="text-sm font-semibold truncate">{s.sellerName}</div>
+          <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: meta.color }}>
             {meta.label}
-          </span>
-        </div>
-      </div>
-
-      {/* 2) Resultado: % da meta e valor realizado / meta na mesma linha */}
-      <div className="mt-3 flex items-end justify-between gap-2">
-        <div className="text-2xl font-display font-bold leading-none" style={{ color: meta.color }}>
-          {fmtPct(s.pctSucesso)}
-        </div>
-        <div className="text-right leading-tight min-w-0">
-          <div className="text-sm font-semibold text-white truncate">{fmtPrincipal(s.realizado)}</div>
-          <div className="text-[10px] text-white/40 truncate">
-            de {fmtPrincipal(s.metaTotal)} {isQtd ? "matriculas" : ""}
           </div>
         </div>
       </div>
-      <div className="mt-2">
+      <div className="min-w-0">
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="font-display font-bold text-base" style={{ color: meta.color }}>{fmtPct(s.pctSucesso)}</span>
+        </div>
         <ProgressBar value={s.pctSucesso} color={meta.color} height={6} />
       </div>
-
-      {/* 3) Indicadores: rotulo, valor e meta empilhados (colunas iguais) */}
-      <div
-        className={`grid gap-1.5 mt-3 ${s.bu === "unicive" ? "grid-cols-4" : "grid-cols-3"}`}
-      >
-        <Stat
-          label="Ticket"
-          value={BRL.format(s.ticketReal)}
-          sub={s.ticketMeta > 0 ? `meta ${BRL.format(s.ticketMeta)}` : "sem meta"}
-          tone={ticketTone}
-        />
-        <Stat
-          label="Conversao"
-          value={fmtPct(s.conversaoReal)}
-          sub={s.conversaoMeta > 0 ? `meta ${fmtPct(s.conversaoMeta)}` : "sem meta"}
-          tone={convTone}
-        />
-        <Stat label="Leads" value={fmtInt.format(s.leads)} />
-        {s.bu === "unicive" && <Stat label="Matriculas" value={fmtInt.format(s.qtdRealizada)} />}
+      <div className="text-right leading-tight">
+        <div className="text-sm font-semibold">{fmtP(s.realizado)}</div>
+        <div className="text-[10px] text-white/40">de {fmtP(s.metaTotal)}</div>
       </div>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-lg bg-panel2 px-2 py-1.5 leading-tight min-w-0">
-      <div className="text-[9px] uppercase tracking-wider text-white/45 truncate">{label}</div>
-      <div className="text-xs font-semibold mt-0.5 truncate" style={{ color: tone || COLOR.neutral }}>
-        {value}
+      <div className="text-right leading-tight">
+        <div className="text-sm font-semibold" style={{ color: ticketTone }}>{BRL.format(s.ticketReal)}</div>
+        <div className="text-[10px] text-white/40">{s.ticketMeta > 0 ? `meta ${BRL.format(s.ticketMeta)}` : "sem meta"}</div>
       </div>
-      <div className="text-[9px] text-white/35 mt-0.5 truncate h-[11px]">{sub ?? ""}</div>
+      <div className="text-right leading-tight">
+        <div className="text-sm font-semibold" style={{ color: convTone }}>{fmtPct(s.conversaoReal)}</div>
+        <div className="text-[10px] text-white/40">{s.conversaoMeta > 0 ? `meta ${fmtPct(s.conversaoMeta)}` : "sem meta"}</div>
+      </div>
+      <div className="text-right text-sm font-semibold">{fmtInt.format(s.leads)}</div>
+      {isUni && <div className="text-right text-sm font-semibold">{fmtInt.format(s.qtdRealizada)}</div>}
     </div>
   );
 }

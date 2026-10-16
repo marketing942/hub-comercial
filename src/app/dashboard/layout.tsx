@@ -13,13 +13,13 @@ export default async function DashLayout({ children }: { children: React.ReactNo
 
   const items: SidebarItem[] = isAdmin
     ? [
+        { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
         {
           href: "/admin/sellers",
           label: "Configuracoes",
           icon: "settings",
           activePrefixes: ["/admin/goals", "/admin/vendas", "/admin/comissoes", "/admin/leads", "/admin/direto"],
         },
-        { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
       ]
     : [
         { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },

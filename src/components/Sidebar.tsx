@@ -2,51 +2,17 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  LogOut,
-  Menu,
-  X,
-  LayoutDashboard,
-  Users,
-  Target,
-  Zap,
-  Trophy,
-  User,
-  ShoppingCart,
-  Receipt,
-  Gamepad2,
-  Coins,
-  Settings,
-  PanelLeftClose,
-  PanelLeft,
-} from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
 export type SidebarItem = {
   href: string;
   label: string;
-  icon: keyof typeof ICONS;
+  icon: string; // mantido por compatibilidade com os layouts; a navegacao nao usa icones
   // Outros prefixos de rota que tambem marcam esse item como ativo
-  // (ex.: "Configuracoes" aponta pra /admin/sellers mas inclui goals/
-  // vendas/comissoes/leads como sub-paginas).
   activePrefixes?: string[];
 };
 
-const ICONS = {
-  dashboard: LayoutDashboard,
-  users: Users,
-  target: Target,
-  leads: Zap,
-  trophy: Trophy,
-  user: User,
-  cart: ShoppingCart,
-  receipt: Receipt,
-  game: Gamepad2,
-  coins: Coins,
-  settings: Settings,
-};
-
-const STORAGE_KEY = "hub_sidebar_collapsed";
-
+// Navegacao no topo: libera toda a largura da tela pro dashboard (TV).
 export default function Sidebar({
   role,
   sellerName,
@@ -58,154 +24,82 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [openMobile, setOpenMobile] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "1") setCollapsed(true);
-  }, []);
-
-  useEffect(() => setOpenMobile(false), [pathname]);
-
-  function toggleCollapse() {
-    const next = !collapsed;
-    setCollapsed(next);
-    localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-  }
+  useEffect(() => setOpen(false), [pathname]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
+  const isActive = (it: SidebarItem) =>
+    pathname === it.href ||
+    (it.href !== "/" && pathname.startsWith(it.href + "/")) ||
+    (it.activePrefixes || []).some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+  const who = sellerName || (role === "admin" ? "Admin" : "Vendedor");
+
   return (
-    <>
-      {/* Topbar mobile com hamburguer */}
-      <header className="lg:hidden sticky top-0 z-40 bg-bg/85 backdrop-blur border-b border-border">
-        <div className="h-14 flex items-center px-4 gap-3">
-          <button
-            onClick={() => setOpenMobile(true)}
-            className="w-10 h-10 grid place-items-center rounded-xl bg-panel2 hover:bg-border"
-            aria-label="Abrir menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 grid place-items-center">
-              <Trophy className="w-4 h-4 text-accent" />
-            </div>
-            <div className="font-semibold text-sm">Hub Comercial</div>
-          </div>
-        </div>
-      </header>
-
-      {/* Botao flutuante pra reabrir no desktop quando colapsada */}
-      {collapsed && (
-        <button
-          onClick={toggleCollapse}
-          className="hidden lg:flex fixed top-3 left-3 z-40 w-10 h-10 items-center justify-center rounded-xl bg-panel border border-border hover:border-accent/40 shadow-glowSoft"
-          title="Mostrar menu"
+    <header className="app-topbar sticky top-0 z-50 border-b border-[var(--hair)] bg-bg/80 backdrop-blur-xl">
+      <div className="mx-auto max-w-[1800px] h-14 px-4 sm:px-6 flex items-center gap-8">
+        <Link
+          href={role === "admin" ? "/admin" : "/dashboard"}
+          className="font-display font-bold tracking-[0.14em] text-[15px] uppercase whitespace-nowrap"
         >
-          <Menu className="w-5 h-5" />
-        </button>
-      )}
+          Hub <span className="text-accent">Comercial</span>
+        </Link>
 
-      {/* Overlay mobile */}
-      {openMobile && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/60 z-40"
-          onClick={() => setOpenMobile(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        data-collapsed={collapsed}
-        className={`
-          fixed top-0 left-0 z-50 h-screen w-64 bg-panel border-r border-border
-          flex flex-col transition-transform duration-200
-          ${openMobile ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0 lg:sticky
-          ${collapsed ? "lg:hidden" : "lg:flex"}
-        `}
-      >
-        <div className="p-4 border-b border-border flex items-center justify-between gap-2">
-          <Link
-            href={role === "admin" ? "/admin" : "/dashboard"}
-            className="flex items-center gap-3 min-w-0"
-          >
-            <div className="w-10 h-10 rounded-xl bg-accent/20 grid place-items-center shrink-0">
-              <Trophy className="w-5 h-5 text-accent" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-semibold text-sm truncate">Hub Comercial</div>
-              <div className="text-[10px] uppercase tracking-wider text-white/40">
-                CPPEM x Unicive
-              </div>
-            </div>
-          </Link>
-          <button
-            className="lg:hidden w-8 h-8 grid place-items-center rounded-lg hover:bg-panel2"
-            onClick={() => setOpenMobile(false)}
-            aria-label="Fechar menu"
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <button
-            className="hidden lg:grid w-8 h-8 place-items-center rounded-lg hover:bg-panel2 text-white/60 hover:text-white"
-            onClick={toggleCollapse}
-            title="Recolher menu"
-          >
-            <PanelLeftClose className="w-4 h-4" />
-          </button>
-        </div>
-
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {items.map((it) => {
-            const Icon = ICONS[it.icon];
-            const active =
-              pathname === it.href ||
-              (it.href !== "/" && pathname.startsWith(it.href + "/")) ||
-              (it.activePrefixes || []).some(
-                (p) => pathname === p || pathname.startsWith(p + "/")
-              );
-            return (
-              <Link
-                key={it.href}
-                href={it.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ${
-                  active
-                    ? "bg-accent/15 text-accent border border-accent/20"
-                    : "text-white/70 hover:bg-panel2 hover:text-white"
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{it.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="hidden md:flex items-stretch gap-1 h-full">
+          {items.map((it) => (
+            <Link
+              key={it.href}
+              href={it.href}
+              className={`relative px-4 grid place-items-center font-ui font-bold uppercase tracking-[0.12em] text-[13px] transition ${
+                isActive(it) ? "text-accent" : "text-white/55 hover:text-white"
+              }`}
+            >
+              {it.label}
+              {isActive(it) && <span className="absolute left-3 right-3 bottom-0 h-[2px] bg-accent rounded-full" />}
+            </Link>
+          ))}
         </nav>
 
-        <div className="p-3 border-t border-border space-y-2">
-          <div className="px-3 py-2 rounded-xl bg-panel2 flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 grid place-items-center text-accent">
-              <User className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-wider text-white/40">
-                {role === "admin" ? "Administrador" : "Vendedor"}
-              </div>
-              <div className="text-sm font-medium truncate">
-                {sellerName || (role === "admin" ? "Admin" : "Vendedor")}
-              </div>
-            </div>
+        <div className="ml-auto flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 text-sm">
+            <span className="font-ui text-[11px] uppercase tracking-[0.14em] text-white/40">
+              {role === "admin" ? "Administrador" : "Vendedor"}
+            </span>
+            <span className="font-semibold">{who}</span>
           </div>
-          <button onClick={logout} className="btn-ghost w-full text-sm">
-            <LogOut className="w-4 h-4" /> Sair
+          <button onClick={logout} className="btn-ghost !py-1.5 !px-3 text-xs" title="Sair">
+            <LogOut className="w-3.5 h-3.5" /> Sair
+          </button>
+          <button
+            className="md:hidden w-9 h-9 grid place-items-center rounded-lg bg-panel2"
+            onClick={() => setOpen((o) => !o)}
+            aria-label="Menu"
+          >
+            {open ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           </button>
         </div>
-      </aside>
-    </>
+      </div>
+
+      {open && (
+        <nav className="md:hidden border-t border-[var(--hair)] px-4 py-2 grid gap-1">
+          {items.map((it) => (
+            <Link
+              key={it.href}
+              href={it.href}
+              className={`px-3 py-2.5 rounded-lg font-ui font-bold uppercase tracking-[0.1em] text-sm ${
+                isActive(it) ? "bg-accent/15 text-accent" : "text-white/70"
+              }`}
+            >
+              {it.label}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </header>
   );
 }
