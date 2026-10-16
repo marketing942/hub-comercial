@@ -5,8 +5,8 @@ import { periodNow, BRL, fmtPct } from "@/lib/calc";
 import { BU_COLOR, BU_LABEL, COLOR, tonePctMeta } from "@/lib/brand";
 import { type BU } from "@/lib/products";
 import { loadCommissionRules, calcCommission, rankBUBonus, type CommissionRules } from "@/lib/commission";
-import StatCard from "@/components/StatCard";
-import { Wallet, Trophy, Flame, Award, Sparkles, TrendingUp } from "lucide-react";
+import ProgressBar from "@/components/ProgressBar";
+import { Flame } from "lucide-react";
 import CommissionProgress from "./CommissionProgress";
 
 export const dynamic = "force-dynamic";
@@ -52,14 +52,14 @@ export default async function GamificationPage({
   const tone = tonePctMeta(calc.pctMeta, meta - realizado);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 max-w-6xl mx-auto">
       {/* Header + BU switcher */}
-      <div className="card-lg flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+      <div className="card-lg !py-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/50">
             Gamificacao — {BU_LABEL[bu]}
           </div>
-          <h1 className="text-xl xl:text-2xl font-bold mt-1">
+          <h1 className="font-display text-xl font-bold mt-0.5">
             Comissao ao vivo de {seller.name.split(" ")[0]}
           </h1>
           <p className="text-xs text-white/50 mt-1">
@@ -87,9 +87,9 @@ export default async function GamificationPage({
       </div>
 
       {/* KPI grande: comissao estimada + tier + bonus */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <section className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
         <div
-          className="card-lg col-span-1 lg:col-span-2 relative overflow-hidden"
+          className="card-lg lg:col-span-3 relative overflow-hidden flex flex-col justify-center"
           style={{ borderColor: color + "55" }}
         >
           <div
@@ -102,7 +102,7 @@ export default async function GamificationPage({
               Comissao estimada do mes
             </div>
             <div
-              className="text-5xl sm:text-6xl font-extrabold mt-2"
+              className="font-display text-4xl sm:text-5xl font-bold mt-1.5 leading-none"
               style={{ color: calc.commissionValue > 0 ? color : "#ada99b" }}
             >
               {BRL.format(calc.commissionValue)}
@@ -124,17 +124,23 @@ export default async function GamificationPage({
           </div>
         </div>
 
-        <StatCard
-          label="Faturamento (Real / Meta)"
-          value={<>{BRL.format(realizado)}<span className="text-white/40 text-base"> / {BRL.format(meta)}</span></>}
-          hint={meta > 0 ? `${fmtPct(calc.pctMeta)} da meta` : "Sem meta definida"}
-          icon={<TrendingUp className="w-4 h-4" />}
-          accent={tone}
-        />
+        <div className="card-lg lg:col-span-2 flex flex-col justify-center">
+          <div className="text-xs uppercase tracking-wider text-white/50">Faturamento (real / meta)</div>
+          <div className="font-display font-bold text-3xl leading-none mt-1.5">
+            {BRL.format(realizado)}
+            <span className="text-white/40 text-base font-semibold"> / {BRL.format(meta)}</span>
+          </div>
+          <div className="mt-3">
+            <ProgressBar value={calc.pctMeta} color={tone} height={6} />
+          </div>
+          <div className="text-sm text-white/60 mt-2">
+            {meta > 0 ? `${fmtPct(calc.pctMeta)} da meta` : "Sem meta definida"}
+          </div>
+        </div>
       </section>
 
       {/* Progresso com avatar andando + Bonus do Podio ao lado */}
-      <section className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-3 items-stretch">
+      <section className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-stretch">
         <CommissionProgress
           color={color}
           rules={rules}
@@ -159,7 +165,7 @@ export default async function GamificationPage({
 
       {/* Tabela de tiers */}
       <section className="card-lg p-0 overflow-hidden">
-        <div className="p-4 border-b border-border">
+        <div className="px-4 py-3 border-b border-border">
           <div className="text-sm font-semibold flex items-center gap-2">
             Tabela de comissao vigente — {BU_LABEL[bu]}
           </div>
@@ -171,10 +177,10 @@ export default async function GamificationPage({
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wider text-white/40 bg-panel2">
             <tr className="text-left">
-              <th className="p-3">% Meta Ind.</th>
-              <th className="p-3">% Comissao</th>
-              <th className="p-3 text-right">Se aplicasse no seu realizado</th>
-              <th className="p-3 text-right">Status</th>
+              <th className="px-4 py-2.5">% Meta Ind.</th>
+              <th className="px-4 py-2.5">% Comissao</th>
+              <th className="px-4 py-2.5 text-right">Se aplicasse no seu realizado</th>
+              <th className="px-4 py-2.5 text-right">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -189,12 +195,12 @@ export default async function GamificationPage({
                     isCurrent ? "bg-accent/5" : ""
                   }`}
                 >
-                  <td className="p-3 font-semibold">{t.meta_pct}%</td>
-                  <td className="p-3 font-semibold" style={{ color: reached ? color : undefined }}>
+                  <td className="px-4 py-2.5 font-semibold">{t.meta_pct}%</td>
+                  <td className="px-4 py-2.5 font-semibold" style={{ color: reached ? color : undefined }}>
                     {t.commission_pct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%
                   </td>
-                  <td className="p-3 text-right text-white/70">{BRL.format(wouldPay)}</td>
-                  <td className="p-3 text-right">
+                  <td className="px-4 py-2.5 text-right text-white/70">{BRL.format(wouldPay)}</td>
+                  <td className="px-4 py-2.5 text-right">
                     {isCurrent ? (
                       <span className="chip" style={{ background: color + "22", color }}>
                         <Flame className="w-3 h-3" /> Voce esta aqui
@@ -266,7 +272,7 @@ function PodiumCard({
             <div className="text-[10px] uppercase tracking-wider text-white/40">
               Sua posicao no podio
             </div>
-            <div className="text-2xl font-extrabold mt-0.5" style={{ color: buBonus.unlocked ? COLOR.ok : color }}>
+            <div className="font-display text-xl font-bold mt-0.5" style={{ color: buBonus.unlocked ? COLOR.ok : color }}>
               {myPodium.position}o lugar
             </div>
             <div className="text-xs text-white/60 mt-0.5">
@@ -301,11 +307,11 @@ function PodiumChip({
   const medals = ["#eab308", "#ada99b", "#b45309"];
   return (
     <div
-      className={`rounded-xl border p-3 ${
+      className={`rounded-xl border px-2 py-2.5 ${
         unlocked ? "border-border bg-panel2" : "border-border/60 bg-panel2/40"
       }`}
     >
-      <div className="text-2xl">{["🥇", "🥈", "🥉"][pos - 1]}</div>
+      <div className="text-xl leading-none">{["🥇", "🥈", "🥉"][pos - 1]}</div>
       <div className="text-[10px] uppercase tracking-wider text-white/50 mt-1">Top {pos}</div>
       <div
         className="text-sm font-bold mt-0.5"

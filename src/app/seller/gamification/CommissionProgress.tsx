@@ -43,7 +43,7 @@ export default function CommissionProgress({
       </div>
 
       {/* ==== Trilha com avatar do vendedor andando ==== */}
-      <div className="relative px-2" style={{ paddingTop: 74, paddingBottom: 44 }}>
+      <div className="relative px-2" style={{ paddingTop: 66, paddingBottom: 38 }}>
         {/* trilha */}
         <div className="relative w-full h-2.5 rounded-full bg-border/60 overflow-visible">
           <div
