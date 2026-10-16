@@ -43,7 +43,7 @@ const loadDashboardData = unstable_cache(
     ]);
     return { snaps, direct, ligacaoAll, indicacaoAll };
   },
-  ["dashboard-data"],
+  ["dashboard-data-v2"],
   { revalidate: DASHBOARD_CACHE_SECONDS, tags: [DASHBOARD_TAG] }
 );
 
@@ -115,8 +115,6 @@ export default async function DashboardPage({
                 totalDays={totalDays}
                 daysLeft={daysLeft}
                 monthName={monthName}
-                ligacao={ligacaoAll}
-                indicacao={indicacaoAll}
               />
             ),
           },
@@ -132,6 +130,9 @@ export default async function DashboardPage({
           day={day}
           totalDays={totalDays}
           daysLeft={daysLeft}
+          // Origens (Onvox / Indicacao): so o admin ve, como ja era no Direto / IA.
+          ligacao={isAdmin ? ligacaoAll : undefined}
+          indicacao={isAdmin ? indicacaoAll : undefined}
         />
       ),
     },

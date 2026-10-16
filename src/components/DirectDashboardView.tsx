@@ -1,184 +1,164 @@
-import type { DirectSnapshot, LigacaoRow, IndicacaoRow } from "@/lib/data";
+import type { DirectSnapshot, DirectChannelAgg, ProductBreakdownRow } from "@/lib/data";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
 import { COLOR } from "@/lib/brand";
-import { LIGACAO_STATUSES, INDICACAO_STATUSES } from "@/lib/products";
-import BigStatCard from "@/components/BigStatCard";
-import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
-import OriginDonut from "@/components/OriginDonut";
+import Cell from "@/components/StatCell";
 
-
+// Direto / IA — duas partes na mesma aba: Site (venda direta) e IA (atendimento).
+// As origens (Onvox e Indicacao) ficam na aba Vendedores.
 export default function DirectDashboardView({
   snap,
-  day,
-  totalDays,
-  daysLeft,
-  monthName,
-  ligacao,
-  indicacao,
 }: {
   snap: DirectSnapshot;
-  day: number;
-  totalDays: number;
-  daysLeft: number;
-  monthName: string;
-  ligacao?: LigacaoRow[];
-  indicacao?: IndicacaoRow[];
+  day?: number;
+  totalDays?: number;
+  daysLeft?: number;
+  monthName?: string;
 }) {
   const t = snap.totals;
-  const hasUnicive = (t.valorUnicive || 0) > 0 || (snap.breakdownUnicive || []).some((r) => r.valor > 0);
+  // Cache de formato antigo (sem "channels"): nao quebra a pagina, so aguarda o proximo refresh.
+  if (!snap.channels) {
+    return <div className="panel p-6 text-sm text-white/60">Atualizando dados do Direto / IA...</div>;
+  }
+  const site = snap.channels.direto;
+  const ia = snap.channels.ia;
+  const share = (v: number) => (t.valor > 0 ? (v / t.valor) * 100 : 0);
 
   return (
-    <div
-      className="space-y-3 rounded-2xl p-3 -m-1 relative overflow-hidden"
-      style={{
-        backgroundImage:
-          "radial-gradient(900px 320px at 15% 0%, rgba(6,182,212,0.16), transparent 60%), radial-gradient(700px 280px at 90% 8%, rgba(167,139,250,0.14), transparent 60%)",
-      }}
-    >
-      {/* Header — compacto, so titulo centralizado */}
-      <div
-        className="rounded-xl py-2 px-3 border border-white/5 text-center"
-        style={{
-          backgroundImage:
-            "linear-gradient(120deg, rgba(6,182,212,0.20), rgba(167,139,250,0.16), rgba(10,25,32,0.55))",
-        }}
-      >
-        <h2 className="text-lg xl:text-xl font-bold tracking-tight">
-          Dashboard Direto / IA
-        </h2>
+    <div className="space-y-4">
+      {/* Visao geral: o total e como ele se divide entre os dois canais */}
+      <section className="panel overflow-hidden">
+        <div className="-ml-px -mt-px grid grid-cols-2 xl:grid-cols-4">
+          <Cell label="Total vendido (Site + IA)" value={BRL.format(t.valor)} />
+          <Cell label="Ticket medio geral" value={BRL.format(t.ticketReal)} />
+          <Cell label="Site (direto)" value={BRL.format(site.valor)}>
+            <Bar pct={share(site.valor)} /> {fmtPct(share(site.valor))} do total
+          </Cell>
+          <Cell label="IA (atendimento)" value={BRL.format(ia.valor)}>
+            <Bar pct={share(ia.valor)} /> {fmtPct(share(ia.valor))} do total
+          </Cell>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <ChannelPanel
+          title="Site"
+          subtitle="Venda direta pelo site"
+          agg={site}
+          stats={
+            <>
+              <Cell label="Faturado" value={BRL.format(site.valor)} />
+              <Cell label="Unidades" value={fmtInt.format(site.qtd)} />
+              <Cell label="Ticket medio" value={BRL.format(site.qtd > 0 ? site.valor / site.qtd : 0)} />
+              <Cell label="Visitas no mes" value={fmtInt.format(t.visits)} />
+              <Cell label="% Conversao" value={fmtPct(t.visits > 0 ? (site.qtd / t.visits) * 100 : 0)}>
+                Unidades do site / visitas
+              </Cell>
+            </>
+          }
+        />
+        <ChannelPanel
+          title="IA"
+          subtitle="Vendas do atendimento por IA"
+          agg={ia}
+          stats={
+            <>
+              <Cell label="Faturado" value={BRL.format(ia.valor)} />
+              <Cell label="Unidades" value={fmtInt.format(ia.qtd)} />
+              <Cell label="Ticket medio" value={BRL.format(ia.qtd > 0 ? ia.valor / ia.qtd : 0)} />
+            </>
+          }
+        />
       </div>
-
-      {/* KPIs grandes — combinado Direto + IA */}
-      <section className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <BigStatCard
-          label="Total Vendido (Direto + IA)"
-          value={BRL.format(t.valor)}
-          accent={COLOR.info}
-          valueColor={COLOR.neutral}
-        />
-        <BigStatCard
-          label="Ticket Medio"
-          value={BRL.format(t.ticketReal)}
-          accent={COLOR.info}
-          valueColor={COLOR.neutral}
-        />
-        <BigStatCard
-          label="% Conversao (site)"
-          value={fmtPct(t.conversao)}
-          accent={COLOR.info}
-          valueColor={COLOR.neutral}
-        />
-        <BigStatCard
-          label="Visitas no Mes (site)"
-          value={fmtInt.format(t.visits)}
-          accent={COLOR.info}
-          valueColor={COLOR.neutral}
-        />
-      </section>
-
-      {/* Split por canal e BU */}
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        <div className="card-lg">
-          <div className="kpi-label mb-2">Split por canal</div>
-          <div className="grid grid-cols-2 gap-2">
-            <SplitTile
-              label="Direto (site)"
-              valor={t.valorDireto}
-              qtd={t.qtdDireto}
-              color="#74aee0"
-            />
-            <SplitTile
-              label="IA (atendimento)"
-              valor={t.valorIA}
-              qtd={t.qtdIA}
-              color="#b99be0"
-            />
-          </div>
-        </div>
-        <div className="card-lg">
-          <div className="kpi-label mb-2">Split por BU</div>
-          <div className="grid grid-cols-2 gap-2">
-            <SplitTile
-              label="CPPEM"
-              valor={t.valorCppem}
-              qtd={t.qtdCppem}
-              color="#5fd08f"
-            />
-            <SplitTile
-              label="UNICIVE"
-              valor={t.valorUnicive}
-              qtd={t.qtdUnicive}
-              color="#f59e0b"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Breakdown CPPEM (direto + IA CPPEM) — abaixo do grafico */}
-      <ProductRevenueBreakdown
-        rows={snap.breakdown}
-        color="#74aee0"
-      />
-
-      {/* Breakdown UNICIVE — so aparece se ha venda IA em UNICIVE */}
-      {hasUnicive && (
-        <ProductRevenueBreakdown
-          rows={snap.breakdownUnicive}
-          color="#c4b5fd"
-        />
-      )}
-
-      {/* ===== Ultima secao: Origem por Onvox e por Indicacao
-          Agregado de todas as BUs — reaproveitado da antiga "Visao Geral". ===== */}
-      {(ligacao || indicacao) && (
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-          {ligacao && (
-            <OriginDonut
-              rows={ligacao}
-              statuses={LIGACAO_STATUSES}
-              title="Origem por Onvox — Geral"
-              subtitle="A ligacao Onvox influenciou a venda? (todas as BUs)"
-            />
-          )}
-          {indicacao && (
-            <OriginDonut
-              rows={indicacao}
-              statuses={INDICACAO_STATUSES}
-              title="Origem por Indicacao — Geral"
-              subtitle="A venda veio de indicacao? (todas as BUs)"
-            />
-          )}
-        </section>
-      )}
     </div>
   );
 }
 
-function SplitTile({
-  icon,
-  label,
-  valor,
-  qtd,
-  color,
+const HEAD = "font-ui text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40";
+
+function Bar({ pct }: { pct: number }) {
+  return (
+    <span className="block mb-1.5 h-[5px] rounded-full bg-white/10 overflow-hidden">
+      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: COLOR.gold }} />
+    </span>
+  );
+}
+
+function ChannelPanel({
+  title,
+  subtitle,
+  agg,
+  stats,
 }: {
-  icon?: React.ReactNode;
-  label: string;
-  valor: number;
-  qtd: number;
-  color: string;
+  title: string;
+  subtitle: string;
+  agg: DirectChannelAgg;
+  stats: React.ReactNode;
 }) {
+  const hasUnicive = agg.valorUnicive > 0 || agg.breakdownUnicive.some((r) => r.valor > 0);
   return (
-    <div className="rounded-xl bg-panel2 p-3">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/50">
-        <span>{label}</span>
+    <section className="panel overflow-hidden">
+      <div className="px-5 py-4 border-b border-[var(--hair)]">
+        <div className="font-display font-bold uppercase tracking-wide text-xl text-accent">{title}</div>
+        <div className="text-xs text-white/45 mt-0.5">{subtitle}</div>
       </div>
-      <div className="text-xl xl:text-2xl font-extrabold mt-0.5" style={{ color }}>
-        {BRL.format(valor)}
+
+      <div className="overflow-hidden">
+        <div className="-ml-px grid grid-cols-2 sm:grid-cols-3">{stats}</div>
       </div>
-      <div className="text-[10px] text-white/40 mt-0.5">
-        {fmtInt.format(qtd)} un.
+
+      {/* Por BU */}
+      <SectionTitle>Por BU</SectionTitle>
+      <div className={`grid grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-4 px-5 py-2 ${HEAD}`}>
+        <span>BU</span>
+        <span className="text-right">Faturado</span>
+        <span className="text-right">Unidades</span>
       </div>
-    </div>
+      {[
+        { label: "CPPEM", valor: agg.valorCppem, qtd: agg.qtdCppem },
+        { label: "UNICIVE", valor: agg.valorUnicive, qtd: agg.qtdUnicive },
+      ].map((r) => (
+        <div
+          key={r.label}
+          className="grid grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-4 px-5 py-2.5 border-t border-[var(--hair)]"
+        >
+          <span className="text-sm font-semibold">{r.label}</span>
+          <span className="text-right text-sm font-semibold">{BRL.format(r.valor)}</span>
+          <span className="text-right text-sm text-white/70">{fmtInt.format(r.qtd)} un.</span>
+        </div>
+      ))}
+
+      {/* Receita por categoria */}
+      <SectionTitle>Receita por categoria</SectionTitle>
+      <CategoryRows title="CPPEM" rows={agg.breakdown} showTitle={hasUnicive} />
+      {hasUnicive && <CategoryRows title="UNICIVE" rows={agg.breakdownUnicive} showTitle />}
+    </section>
   );
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div className="px-5 py-2.5 border-t border-[var(--hair)] bg-white/[0.02] eyebrow-label">{children}</div>;
+}
+
+function CategoryRows({ title, rows, showTitle }: { title: string; rows: ProductBreakdownRow[]; showTitle: boolean }) {
+  const visible = rows.filter((r) => r.valor > 0 || r.qtd > 0 || r.valor_meta > 0 || r.quantidade_meta > 0);
+  const list = visible.length > 0 ? visible : rows;
+  return (
+    <div>
+      {showTitle && (
+        <div className={`px-5 pt-2 ${HEAD}`} style={{ color: "var(--gold-light)" }}>
+          {title}
+        </div>
+      )}
+      {list.map((r) => (
+        <div
+          key={`${title}_${r.product_line}`}
+          className="grid grid-cols-[minmax(0,1fr)_auto_4.5rem] items-center gap-4 px-5 py-2.5 border-t border-[var(--hair)]"
+        >
+          <span className="text-sm font-semibold truncate">{r.label}</span>
+          <span className="text-right text-sm font-semibold">{BRL.format(r.valor)}</span>
+          <span className="text-right text-sm text-white/70">{fmtInt.format(r.qtd)} un.</span>
+        </div>
+      ))}
+    </div>
+  );
+}

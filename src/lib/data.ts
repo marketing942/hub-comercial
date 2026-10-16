@@ -787,6 +787,20 @@ export type DirectSnapshot = {
   };
   breakdown: ProductBreakdownRow[];         // por linha de produto CPPEM (direto + IA CPPEM)
   breakdownUnicive: ProductBreakdownRow[];  // por linha de produto UNICIVE (so IA)
+  // Mesmos numeros, separados por canal (Site/direto x IA). Campo novo: nada acima mudou.
+  channels: { direto: DirectChannelAgg; ia: DirectChannelAgg };
+};
+
+export type DirectChannelAgg = {
+  valor: number;
+  qtd: number;
+  vendasCount: number;
+  valorCppem: number;
+  qtdCppem: number;
+  valorUnicive: number;
+  qtdUnicive: number;
+  breakdown: ProductBreakdownRow[];
+  breakdownUnicive: ProductBreakdownRow[];
 };
 
 export async function directSnapshot(opts?: {
@@ -881,6 +895,34 @@ export async function directSnapshot(opts?: {
   const breakdown = Object.values(map);
   const breakdownUnicive = Object.values(mapUni);
 
+  // Mesmas vendas, agrupadas por canal (IA = channel "ia"; o resto e Site/direto,
+  // igual a regra usada nos totais acima).
+  const aggregateChannel = (wantIA: boolean): DirectChannelAgg => {
+    const m: Record<string, ProductBreakdownRow> = {};
+    for (const id of cppemIds) {
+      m[id] = { product_line: id, label: productLabel(id), valor: 0, qtd: 0, valor_meta: 0, quantidade_meta: 0 };
+    }
+    const mu: Record<string, ProductBreakdownRow> = {};
+    for (const id of unciveIds) {
+      mu[id] = { product_line: id, label: productLabel(id), valor: 0, qtd: 0, valor_meta: 0, quantidade_meta: 0 };
+    }
+    const a = { valor: 0, qtd: 0, vendasCount: 0, valorCppem: 0, qtdCppem: 0, valorUnicive: 0, qtdUnicive: 0 };
+    for (const r of sales) {
+      if ((r.channel === "ia") !== wantIA) continue;
+      const v = Number(r.valor || 0);
+      const q = Number(r.quantidade || 0);
+      a.valor += v; a.qtd += q; a.vendasCount += 1;
+      if (cppemSet.has(r.product_line)) {
+        a.valorCppem += v; a.qtdCppem += q;
+        if (m[r.product_line]) { m[r.product_line].valor += v; m[r.product_line].qtd += q; }
+      } else if (uniciveSet.has(r.product_line)) {
+        a.valorUnicive += v; a.qtdUnicive += q;
+        if (mu[r.product_line]) { mu[r.product_line].valor += v; mu[r.product_line].qtd += q; }
+      }
+    }
+    return { ...a, breakdown: Object.values(m), breakdownUnicive: Object.values(mu) };
+  };
+
   return {
     year,
     month,
@@ -900,6 +942,7 @@ export async function directSnapshot(opts?: {
     },
     breakdown,
     breakdownUnicive,
+    channels: { direto: aggregateChannel(false), ia: aggregateChannel(true) },
   };
 }
 
