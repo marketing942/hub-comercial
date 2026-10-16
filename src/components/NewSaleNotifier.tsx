@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Trophy, X, Wallet } from "lucide-react";
 import { BRL } from "@/lib/calc";
+import { playAirHorn } from "@/lib/airHorn";
 
 type Sale = {
   id: string;
@@ -13,7 +14,7 @@ type Sale = {
 type Toast = Sale & { closingAt: number };
 
 const POLL_MS = 7_000;         // de quanto em quanto tempo busca
-const SHOW_MS = 3_000;         // tempo visivel por notificacao
+const SHOW_MS = 8_000;         // tempo visivel por notificacao (minimo de 7s)
 const STORAGE_KEY = "hub_last_sale_notifier";
 
 export default function NewSaleNotifier() {
@@ -128,8 +129,11 @@ function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     <div
       className="pointer-events-auto w-[320px] rounded-2xl shadow-glow border overflow-hidden animate-in slide-in-from-right duration-200 cursor-pointer"
       style={{
-        background: "linear-gradient(135deg, rgba(175,146,86,0.28), rgba(17,17,21,0.97))",
-        borderColor: "rgba(175,146,86,0.55)",
+        // Fundo translucido: o dashboard continua visivel por tras (com leve desfoque).
+        background: "linear-gradient(135deg, rgba(175,146,86,0.20), rgba(17,17,21,0.55))",
+        borderColor: "rgba(175,146,86,0.45)",
+        backdropFilter: "blur(14px)",
+        WebkitBackdropFilter: "blur(14px)",
       }}
       onClick={onClose}
       role="button"
@@ -167,7 +171,7 @@ function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       <div
         className="h-1 bg-success/80"
         style={{
-          animation: "sale-toast-countdown 3s linear forwards",
+          animation: `sale-toast-countdown ${SHOW_MS}ms linear forwards`,
           transformOrigin: "left",
         }}
       />
@@ -211,44 +215,4 @@ function persistSeenIds(set: Set<string>) {
     const arr = Array.from(set).slice(-500);
     localStorage.setItem(STORAGE_KEY + ":ids", JSON.stringify(arr));
   } catch {}
-}
-
-// Buzina de gas comemorativa sintetizada via Web Audio API — volume
-// baixo (gain 0.08). Dois pulsos curtos + um longo (padrao "ta-ta-taaa").
-function playAirHorn(ctx: AudioContext | null) {
-  if (!ctx) return;
-  try {
-    const now = ctx.currentTime;
-    pulse(ctx, now, 0.12);
-    pulse(ctx, now + 0.18, 0.12);
-    pulse(ctx, now + 0.38, 0.55);
-  } catch {
-    // audio nao disponivel ainda (sem gesto do usuario) — ignora
-  }
-}
-
-function pulse(ctx: AudioContext, start: number, duration: number) {
-  // Mistura 3 osciladores sawtooth em oitavas pra dar corpo de buzina.
-  const freqs = [220, 330, 440];
-  const master = ctx.createGain();
-  master.gain.setValueAtTime(0, start);
-  master.gain.linearRampToValueAtTime(0.08, start + 0.015);
-  master.gain.linearRampToValueAtTime(0.08, start + duration - 0.08);
-  master.gain.linearRampToValueAtTime(0, start + duration);
-  master.connect(ctx.destination);
-
-  const filt = ctx.createBiquadFilter();
-  filt.type = "lowpass";
-  filt.frequency.value = 1800;
-  filt.Q.value = 0.6;
-  filt.connect(master);
-
-  for (const f of freqs) {
-    const osc = ctx.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.value = f;
-    osc.connect(filt);
-    osc.start(start);
-    osc.stop(start + duration + 0.02);
-  }
 }
