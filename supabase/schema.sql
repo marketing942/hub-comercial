@@ -349,3 +349,19 @@ create policy "realizado update" on public."realizado_data" as permissive for up
 
 -- Bucket publico das fotos dos vendedores
 insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true) on conflict (id) do nothing;
+
+-- ---------- Aba "Ano" (Configuracoes): realizado anual por BU ----------
+-- 1 linha por BU + ano + mes, so totais (sem categorias nem metas).
+-- A carga dos dados do painel antigo esta em supabase/migrate-realizado-ano.sql.
+create table if not exists public.year_realizado (
+  bu             text    not null check (bu in ('cppem', 'unicive', 'colegio_cppem')),
+  year           integer not null check (year between 2024 and 2100),
+  month          integer not null check (month between 1 and 12),
+  receita        numeric(14,2) not null default 0,
+  qtd            integer not null default 0,
+  leads_pago     integer not null default 0,
+  leads_organico integer not null default 0,
+  updated_at     timestamptz not null default now(),
+  primary key (bu, year, month)
+);
+alter table public.year_realizado enable row level security;

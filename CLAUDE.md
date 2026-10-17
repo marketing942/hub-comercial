@@ -65,7 +65,7 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 
 - **Barra no topo** (não há sidebar; o arquivo `Sidebar.tsx` renderiza o `<header class="app-topbar">`): sticky `h-14`, `bg-bg/80 backdrop-blur-xl`, borda inferior `--hair`. Logo em texto “HUB **COMERCIAL**” (Oxanium, tracking .14em, “Comercial” em `accent`). Itens **só texto** (o prop `icon` existe por compatibilidade e é ignorado), Rajdhani bold maiúsculo 13px; ativo = texto `accent` + barra de 2px embaixo (`activePrefixes` marca sub-rotas como ativas).
 - **Carrossel do Dashboard TV** (`DashboardCarousel`): abas das BUs com o mesmo sublinhado; sob a aba ativa corre uma barra dourada de contagem regressiva até o próximo slide; à direita período, relógio “Atualizado”, pausar, atualizar, tela cheia.
-- **Configurações** (admin) = menu único com sub-abas em pílula (`ConfiguracoesSubnav`): Vendedores · Metas · Todas as Vendas · Comissões · Leads · Direto / IA.
+- **Configurações** (admin) = menu único com sub-abas em pílula (`ConfiguracoesSubnav`): Vendedores · Metas · Todas as Vendas · Comissões · Leads · Direto / IA · Ano.
 - ⚠️ Os itens de navegação estão **duplicados em 3 layouts**: `src/app/admin/layout.tsx`, `src/app/dashboard/layout.tsx` e `src/app/seller/layout.tsx`. Ao criar/renomear aba, altere **todos** (e `activePrefixes`, e `TABS` do subnav se for sub-aba de Configurações).
 
 ## 5. Dashboard TV (modo TV)
@@ -84,6 +84,15 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 - **Compacto na vertical**: cards baixos, pouco padding, sem ícones decorativos, cabeçalhos de página enxutos.
 - Datas sempre no fuso de Recife (`todayISORecife`, `nowRecife`); nunca `toISOString()` para “hoje”. Não aceitar data futura em vendas.
 - Textos de UI em português; historicamente **sem acentos** nas strings (há exceções recentes, ex.: “Gestão”) — siga o que o arquivo já usa.
+
+## 6.1 Aba “Ano” (Configurações → Ano)
+
+- Planilha de **realizado anual por BU** (CPPEM · UNICIVE · Colégio), 12 meses + total do ano, com auto-save por mês (debounce 700 ms; grava o pendente ao trocar de ano/sair). Só **totais**: receita, qtd de vendas, leads pagos, leads orgânicos; ticket médio e conversão são calculados. **Sem receita por categoria e sem metas** (decisão do time). Independente das vendas lançadas no Hub (entrada manual).
+- Código: `src/app/admin/ano/` (página servidor + `ano-client.tsx`), `src/app/api/year/route.ts` (POST, só admin, valida e arredonda), `src/lib/yearMath.ts` (tipos/cálculos **puros**, seguros para o cliente) e `src/lib/yearRealizado.ts` (leitura no servidor; degrada para “tabela ainda não criada” se faltar a tabela).
+- Banco: tabela `year_realizado (bu, year, month, receita, qtd, leads_pago, leads_organico)` com PK `(bu, year, month)`, BUs no padrão do Hub (`cppem`/`unicive`/`colegio_cppem`). A carga dos dados do painel antigo (Dashboard-Marketing → `realizado_data`; `unicv`→`unicive`, `colegio`→`colegio_cppem`) está em `supabase/migrate-realizado-ano.sql` (idempotente, não sobrescreve edições).
+- ⚠️ Nunca importar `lib/supabase.ts` (service_role) em componente de cliente: tipos/cálculos usados no navegador vão em arquivo separado, como `yearMath.ts`.
+- ⚠️ Em `next dev` as páginas **não hidratam** (a CSP do projeto bloqueia `unsafe-eval`). Para testar UI use `next build && next start`.
+- As tabelas do painel antigo (`cac_data`, `breakeven_data`, `metas_data`, `pace_data`, `realizado_data`) continuam no banco mas **não são usadas pelo Hub**; CAC e breakeven foram descartados.
 
 ## 7. Pendências de identidade (não bloqueiam)
 
