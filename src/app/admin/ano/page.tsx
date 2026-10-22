@@ -25,17 +25,7 @@ export default async function AnoPage({
           Realizado total de cada mes, por BU. Os valores sao digitados aqui e salvos sozinhos.
         </p>
       </div>
-      {tableMissing && (
-        <div className="panel p-4 text-sm" style={{ borderColor: "rgba(240,180,76,0.45)" }}>
-          <div className="eyebrow-label" style={{ color: "#f0b44c" }}>Tabela ainda nao criada</div>
-          <p className="mt-1.5 text-white/70">
-            Rode o arquivo <b>supabase/migrate-realizado-ano.sql</b> no SQL Editor do Supabase.
-            Ele cria a tabela e traz os dados do painel antigo. Enquanto isso, a aba abre vazia e
-            nao consegue salvar.
-          </p>
-        </div>
-      )}
-      <AnoClient key={year} year={year} initialGrid={grid} disabled={tableMissing} />
+      <AnoClient key={year} year={year} initialGrid={grid} initialTableMissing={tableMissing} />
     </div>
   );
 }

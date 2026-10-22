@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import NumberField from "@/components/NumberField";
@@ -27,17 +27,26 @@ const SAVE_DELAY_MS = 700;
 export default function AnoClient({
   year,
   initialGrid,
-  disabled,
+  initialTableMissing,
 }: {
   year: number;
   initialGrid: YearGrid;
-  disabled: boolean;
+  initialTableMissing: boolean;
 }) {
   const router = useRouter();
   const [bu, setBu] = useState<BU>("cppem");
   const [grid, setGrid] = useState<YearGrid>(initialGrid);
   const [status, setStatus] = useState<Status>("idle");
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [tableMissing, setTableMissing] = useState(initialTableMissing);
+  // Os campos ficam travados ate chegarem os dados FRESCOS do servidor. O Next
+  // reaproveita no navegador a pagina ja visitada (ao voltar por link ela vem de
+  // antes das edicoes); digitar em cima dela gravaria o mes inteiro com valores
+  // velhos e poderia zerar vendas/leads que ja estavam no banco.
+  const [ready, setReady] = useState(false);
+  const [loadErr, setLoadErr] = useState(false);
+  const dirty = useRef(false); // true = ha edicao local ainda nao confirmada no banco
+  const locked = tableMissing || !ready;
 
   // A grade mais recente, pro salvamento (debounced) nunca usar valor velho.
   const gridRef = useRef(grid);
@@ -63,6 +72,7 @@ export default function AnoClient({
       setErrMsg(null);
       inflight.current -= 1;
       if (inflight.current === 0 && Object.keys(timers.current).length === 0) {
+        dirty.current = false;
         setStatus("saved");
       }
     } catch (e: any) {
@@ -71,6 +81,39 @@ export default function AnoClient({
       setStatus("error");
     }
   }
+
+  // Busca os dados frescos. Nunca sobrescreve o que o usuario esta editando.
+  const refresh = useCallback(async () => {
+    const busy = () =>
+      dirty.current || inflight.current > 0 || Object.keys(timers.current).length > 0;
+    if (busy()) return;
+    try {
+      const r = await fetch(`/api/year?year=${year}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(String(r.status));
+      const j = await r.json();
+      if (busy()) return; // o usuario comecou a editar enquanto buscava
+      setGrid(j.grid as YearGrid);
+      setTableMissing(Boolean(j.tableMissing));
+      setLoadErr(false);
+      setReady(true);
+    } catch {
+      setLoadErr(true);
+    }
+  }, [year]);
+
+  // Ao abrir e ao voltar pra esta janela (ex.: depois de rodar um SQL no Supabase).
+  useEffect(() => {
+    void refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [refresh]);
 
   // Ao sair da aba (ou trocar de ano), grava o que ainda estava pendente.
   useEffect(() => {
@@ -87,6 +130,7 @@ export default function AnoClient({
 
   function setCell(m: number, field: Field, v: number) {
     const value = v < 0 ? 0 : v;
+    dirty.current = true;
     setGrid((prev) => ({
       ...prev,
       [bu]: { ...prev[bu], [m]: { ...prev[bu][m], [field]: value } },
@@ -119,6 +163,25 @@ export default function AnoClient({
 
   return (
     <div className="space-y-4">
+      {tableMissing && (
+        <div className="panel p-4 text-sm" style={{ borderColor: "rgba(240,180,76,0.45)" }}>
+          <div className="eyebrow-label" style={{ color: COLOR.warning }}>Tabela ainda nao criada</div>
+          <p className="mt-1.5 text-white/70">
+            Rode o arquivo <b>supabase/migrate-realizado-ano.sql</b> no SQL Editor do Supabase.
+            Ele cria a tabela e traz os dados do painel antigo. Enquanto isso, a aba abre vazia e
+            nao consegue salvar.
+          </p>
+        </div>
+      )}
+      {loadErr && !ready && (
+        <div className="panel p-4 text-sm" style={{ borderColor: "rgba(238,125,115,0.45)" }}>
+          <div className="eyebrow-label" style={{ color: COLOR.danger }}>Nao foi possivel carregar os dados</div>
+          <p className="mt-1.5 text-white/70">
+            Para nao gravar por cima de valores antigos, os campos ficam travados. Recarregue a pagina (F5).
+          </p>
+        </div>
+      )}
+
       {/* Barra: BU + ano + status do salvamento */}
       <div className="panel p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex p-1 rounded-xl bg-panel border border-border flex-wrap">
@@ -234,7 +297,7 @@ export default function AnoClient({
                             min={0}
                             value={months[m][row.field]}
                             onChange={(v) => setCell(m, row.field, v)}
-                            disabled={disabled}
+                            disabled={locked}
                             aria-label={`${row.label} ${mn}`}
                           />
                         </td>

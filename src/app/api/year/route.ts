@@ -3,6 +3,24 @@ import { getSession } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { ALL_BUS, type BU } from "@/lib/products";
 import { YEAR_MAX, YEAR_MIN } from "@/lib/yearMath";
+import { loadYear } from "@/lib/yearRealizado";
+
+export const dynamic = "force-dynamic";
+
+// GET /api/year?year=2026 -> { grid, tableMissing }. So admin. Sempre fresco (no-store):
+// a aba Ano busca aqui ao abrir, porque o Next guarda no navegador a pagina ja
+// visitada e, ao voltar por link, mostraria dados de antes da edicao.
+export async function GET(req: Request) {
+  const s = await getSession();
+  if (s?.role !== "admin") return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
+  const year = Number(new URL(req.url).searchParams.get("year"));
+  if (!Number.isInteger(year) || year < YEAR_MIN || year > YEAR_MAX) {
+    return NextResponse.json({ error: "Ano invalido." }, { status: 400 });
+  }
+  const { grid, tableMissing } = await loadYear(year);
+  return NextResponse.json({ grid, tableMissing }, { headers: { "Cache-Control": "no-store" } });
+}
+
 
 // POST /api/year { bu, year, month, receita, qtd, leads_pago, leads_organico }
 // Grava (upsert) os totais de UM mes de uma BU na aba Ano. So admin.
