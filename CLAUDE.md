@@ -75,6 +75,7 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 - Gráfico (`UnifiedDailyChart`, Recharts `ComposedChart`): grade `#2d2c3a`, eixos `#87847a`, série principal na cor da BU, leads em `COLOR.info`, % meta na cor semântica, ideal tracejado `#f0b44c`; tooltip próprio (`#14141b`, borda `#4a4230`, título dourado maiúsculo, diferença p.p. vs ritmo ideal).
 - Números nunca podem estourar o card: use `truncate`, `clamp()` (como `StatCell`) ou reduza a fonte.
 - Notificação de venda nova (`NewSaleNotifier`): toast no canto sup. direito, fundo dourado translúcido com `backdrop-blur`, ícone de troféu em `success`, ~8s, botão X; buzina Web Audio sintetizada em `src/lib/airHorn.ts` (desbloqueia no primeiro gesto do usuário).
+- **Meu Painel do vendedor** (`src/app/seller/page.tsx`): mesmo desenho do dash da BU — `.panel` à esquerda com faixa de `Cell`s (meta + barra, meta do dia, realizado hoje, Pace, Projeção, ticket, conversão, leads) e `.panel` à direita com `UnifiedDailyChart` das vendas **do próprio vendedor** (`sellerSeries` em `src/lib/data.ts`; % da meta individual vs ritmo ideal). Faturamento do card vem de `stats.valorRealizado/valorMeta` (do vendedor), não da BU.
 - Perfis: admin vê todos os slides (inclui Direto/IA); vendedor vê só os slides das próprias BUs + “Vendedores”.
 
 ## 6. Padrões de UX que o time aprovou

@@ -531,6 +531,69 @@ export async function buSeries(
   };
 }
 
+// Serie diaria de UM vendedor numa BU (mesmo formato do buSeries, pra reusar o
+// UnifiedDailyChart). `meta` = meta do vendedor na metrica primaria da BU
+// (stats.metaTotal): o % acumulado e comparado ao ritmo ideal linear do mes.
+// Leads nao distinguem BU (daily_leads e por vendedor).
+export async function sellerSeries(
+  seller: Seller,
+  bu: "cppem" | "unicive" | "colegio_cppem",
+  meta: number,
+  opts?: { year?: number; month?: number }
+): Promise<{ daily: DailySeriesRow[]; cumulative: CumulativeRow[] }> {
+  const { year, month } = { ...periodNow(), ...opts };
+  const mm = String(month).padStart(2, "0");
+  const firstDay = `${year}-${mm}-01`;
+  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
+  const total = daysInMonth(year, month);
+  const productIds = productIdsFor(bu) as unknown as string[];
+
+  const [{ data: sales }, { data: leadsRows }] = await Promise.all([
+    supabaseAdmin
+      .from("sales")
+      .select("sale_date, valor, quantidade")
+      .eq("seller_id", seller.id)
+      .in("product_line", productIds)
+      .gte("sale_date", firstDay)
+      .lt("sale_date", lastDay),
+    supabaseAdmin
+      .from("daily_leads")
+      .select("date, qty")
+      .eq("seller_id", seller.id)
+      .gte("date", firstDay)
+      .lt("date", lastDay),
+  ]);
+
+  const buckets: Record<string, { valor: number; qtd: number; leads: number }> = {};
+  for (let d = 1; d <= total; d++) {
+    buckets[`${year}-${mm}-${String(d).padStart(2, "0")}`] = { valor: 0, qtd: 0, leads: 0 };
+  }
+  for (const r of (sales as any[]) || []) {
+    const b = buckets[String(r.sale_date).slice(0, 10)];
+    if (!b) continue;
+    b.valor += Number(r.valor || 0);
+    b.qtd += Number(r.quantidade || 0);
+  }
+  for (const r of (leadsRows as any[]) || []) {
+    const b = buckets[String(r.date).slice(0, 10)];
+    if (b) b.leads += Number(r.qty || 0);
+  }
+
+  const isQtd = isQtdPrimary(bu);
+  const daily: DailySeriesRow[] = [];
+  const cumulative: CumulativeRow[] = [];
+  let run = 0;
+  for (let d = 1; d <= total; d++) {
+    const b = buckets[`${year}-${mm}-${String(d).padStart(2, "0")}`];
+    run += isQtd ? b.qtd : b.valor;
+    const label = `${String(d).padStart(2, "0")}/${mm}`;
+    daily.push({ day: label, valor: b.valor, qtd: b.qtd, leads: b.leads });
+    cumulative.push({ day: label, pct: meta > 0 ? (run / meta) * 100 : 0, idealPct: (d / total) * 100 });
+  }
+  return { daily, cumulative };
+}
+
 // =====================================================
 // Breakdown por linha de produto (mantem fluxo de bu_product_goals)
 // =====================================================
