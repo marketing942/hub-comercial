@@ -1,27 +1,19 @@
 "use client";
-import { BRL, fmtPct } from "@/lib/calc";
-import type { CommissionRules, CommissionTier } from "@/lib/commission";
-import { Rocket, Zap } from "lucide-react";
+import { fmtPct } from "@/lib/calc";
+import type { CommissionRules } from "@/lib/commission";
+import { Zap } from "lucide-react";
 
 export default function CommissionProgress({
   color,
   rules,
-  realizado,
-  meta,
   pctMeta,
-  nextTier,
-  toNextTier,
   avatarUrl,
   avatarInitial,
   avatarColor,
 }: {
   color: string;
   rules: CommissionRules;
-  realizado: number;
-  meta: number;
   pctMeta: number;
-  nextTier: CommissionTier | null;
-  toNextTier: number;
   avatarUrl?: string | null;
   avatarInitial: string;
   avatarColor: string;
@@ -32,7 +24,7 @@ export default function CommissionProgress({
   const barPct = Math.min(100, (pctMeta / scale) * 100);
 
   return (
-    <div className="card-lg h-full flex flex-col">
+    <div className="card-lg flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold flex items-center gap-2">
           Sua jornada ate o proximo checkpoint
@@ -43,7 +35,7 @@ export default function CommissionProgress({
       </div>
 
       {/* ==== Trilha com avatar do vendedor andando ==== */}
-      <div className="relative px-2" style={{ paddingTop: 66, paddingBottom: 38 }}>
+      <div className="relative px-2" style={{ paddingTop: 66, paddingBottom: 34 }}>
         {/* trilha */}
         <div className="relative w-full h-2.5 rounded-full bg-border/60 overflow-visible">
           <div
@@ -132,38 +124,6 @@ export default function CommissionProgress({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Resumo compacto no rodape */}
-      <div className="mt-auto grid grid-cols-3 gap-2">
-        <MiniStat label="Realizado" value={BRL.format(realizado)} />
-        <MiniStat label="Meta" value={BRL.format(meta)} />
-        <MiniStat
-          label={nextTier ? `Faltam pra ${nextTier.meta_pct}%` : "Tier maximo"}
-          value={nextTier ? BRL.format(toNextTier) : "🏆"}
-          highlightColor={nextTier ? color : "#5fd08f"}
-        />
-      </div>
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-  highlightColor,
-}: {
-  label: string;
-  value: string;
-  highlightColor?: string;
-}) {
-  return (
-    <div className="rounded-xl bg-panel2 p-2.5">
-      <div className="text-[10px] uppercase tracking-wider text-white/50 leading-tight">
-        {label}
-      </div>
-      <div className="text-sm font-bold mt-0.5" style={highlightColor ? { color: highlightColor } : undefined}>
-        {value}
       </div>
     </div>
   );

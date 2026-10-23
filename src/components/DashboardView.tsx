@@ -330,7 +330,7 @@ function ScoreRing({ pct, color, size = 188 }: { pct: number; color: string; siz
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c - (v / 100) * c}
-          style={{ filter: `drop-shadow(0 0 8px ${color}aa)`, transition: "stroke-dashoffset 700ms ease" }}
+          style={{ transition: "stroke-dashoffset 700ms ease" }}
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">

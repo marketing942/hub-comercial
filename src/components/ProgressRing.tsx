@@ -33,7 +33,7 @@ export default function ProgressRing({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={off}
-          style={{ transition: "stroke-dashoffset 600ms ease", filter: `drop-shadow(0 0 6px ${color}99)` }}
+          style={{ transition: "stroke-dashoffset 600ms ease" }}
         />
       </svg>
       <div className="absolute inset-0 grid place-items-center text-center">
