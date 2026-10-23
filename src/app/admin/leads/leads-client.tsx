@@ -170,7 +170,7 @@ export default function LeadsClient({
               </div>
 
               <div className="card p-0 overflow-hidden">
-                <table className="w-full text-sm">
+                <table className="table-stack w-full text-sm">
                   <thead className="text-[10px] uppercase tracking-wider text-white/40 bg-panel2/60">
                     <tr className="text-left">
                       <th className="p-3">Vendedor</th>
@@ -192,8 +192,8 @@ export default function LeadsClient({
                       const outras = sBus.filter((b) => b !== s.bu);
                       return (
                         <tr key={s.id} className="border-t border-border">
-                          <td className="p-3 font-medium">{s.name}</td>
-                          <td className="p-3">
+                          <td data-label="Vendedor" className="p-3 font-medium">{s.name}</td>
+                          <td data-label="Tambem atua em" className="p-3">
                             {outras.length === 0 ? (
                               <span className="text-[11px] text-white/30">—</span>
                             ) : (
@@ -215,7 +215,7 @@ export default function LeadsClient({
                               </div>
                             )}
                           </td>
-                          <td className="p-3">
+                          <td data-label="Leads no dia" className="p-3">
                             <NumberField
                               className="input h-9"
                               min={0}
@@ -223,7 +223,7 @@ export default function LeadsClient({
                               onChange={(v) => setValues((m) => ({ ...m, [s.id]: v }))}
                             />
                           </td>
-                          <td className="p-3 font-semibold">{monthly[s.id] ?? 0}</td>
+                          <td data-label="Total no mes" className="p-3 font-semibold">{monthly[s.id] ?? 0}</td>
                         </tr>
                       );
                     })}

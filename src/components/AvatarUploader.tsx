@@ -146,7 +146,7 @@ export default function AvatarUploader({
       </div>
       <div className="text-xs text-white/60">
         <div className="text-white text-sm font-medium">Sua foto</div>
-        <div className="leading-snug">
+        <div className="leading-snug max-sm:hidden">
           A foto e redimensionada automaticamente. Pode mandar a sua imagem normal,
           a gente reduz e otimiza pra voce.
         </div>

@@ -72,11 +72,11 @@ export default function Sidebar({
             </span>
             <span className="font-semibold">{who}</span>
           </div>
-          <button onClick={logout} className="btn-ghost !py-1.5 !px-3 text-xs" title="Sair">
+          <button onClick={logout} className="btn-ghost !py-1.5 !px-3 text-xs max-sm:!px-2.5" title="Sair">
             <LogOut className="w-3.5 h-3.5" /> Sair
           </button>
           <button
-            className="md:hidden w-9 h-9 grid place-items-center rounded-lg bg-panel2"
+            className="md:hidden w-11 h-11 grid place-items-center rounded-lg bg-panel2"
             onClick={() => setOpen((o) => !o)}
             aria-label="Menu"
           >
@@ -86,12 +86,12 @@ export default function Sidebar({
       </div>
 
       {open && (
-        <nav className="md:hidden border-t border-[var(--hair)] px-4 py-2 grid gap-1">
+        <nav className="md:hidden border-t border-[var(--hair)] px-4 py-2 grid gap-1 max-h-[calc(100dvh-3.5rem)] overflow-y-auto">
           {items.map((it) => (
             <Link
               key={it.href}
               href={it.href}
-              className={`px-3 py-2.5 rounded-lg font-ui font-bold uppercase tracking-[0.1em] text-sm ${
+              className={`px-3 py-3.5 rounded-lg font-ui font-bold uppercase tracking-[0.1em] text-sm ${
                 isActive(it) ? "bg-accent/15 text-accent" : "text-white/70"
               }`}
             >

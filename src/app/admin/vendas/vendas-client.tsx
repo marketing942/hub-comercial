@@ -207,7 +207,7 @@ export default function VendasClient({
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1000px]">
+          <table className="table-stack w-full text-sm min-w-[1000px]">
             <thead className="text-xs uppercase tracking-wider text-white/40 bg-panel2">
               <tr className="text-left">
                 <th className="p-3">Data</th>
@@ -237,13 +237,13 @@ export default function VendasClient({
                 const ind = s.indicacao_status || "sem_indicacao";
                 return (
                   <tr key={s.id} className="border-t border-border align-top">
-                    <td className="p-3 whitespace-nowrap">
+                    <td data-label="Data" className="p-3 whitespace-nowrap">
                       {new Date(s.sale_date + "T00:00").toLocaleDateString("pt-BR")}
                     </td>
-                    <td className="p-3 whitespace-nowrap font-medium">
+                    <td data-label="Vendedor" className="p-3 whitespace-nowrap font-medium">
                       {vendedor?.name || <span className="text-white/40">—</span>}
                     </td>
-                    <td className="p-3 whitespace-nowrap">
+                    <td data-label="BU" className="p-3 whitespace-nowrap">
                       <span
                         className="chip"
                         style={{ background: BU_COLOR[b] + "22", color: BU_COLOR[b] }}
@@ -251,8 +251,8 @@ export default function VendasClient({
                         {BU_LABEL[b]}
                       </span>
                     </td>
-                    <td className="p-3">{productLabel(s.product_line)}</td>
-                    <td className="p-3">
+                    <td data-label="Produto" className="p-3">{productLabel(s.product_line)}</td>
+                    <td data-label="Cliente" className="p-3">
                       {s.cliente_nome ? (
                         <span className="inline-flex items-center gap-1">
                           <User className="w-3 h-3 text-white/40" />
@@ -262,11 +262,11 @@ export default function VendasClient({
                         <span className="text-white/30 text-xs">—</span>
                       )}
                     </td>
-                    <td className="p-3 text-right font-semibold whitespace-nowrap">
+                    <td data-label="Valor" className="p-3 text-right font-semibold whitespace-nowrap">
                       {BRL.format(Number(s.valor || 0))}
                     </td>
-                    <td className="p-3 text-right whitespace-nowrap">{s.quantidade}</td>
-                    <td className="p-3 whitespace-nowrap">
+                    <td data-label="Qtd" className="p-3 text-right whitespace-nowrap">{s.quantidade}</td>
+                    <td data-label="Origem" className="p-3 whitespace-nowrap">
                       <span
                         className="chip"
                         style={{
@@ -277,7 +277,7 @@ export default function VendasClient({
                         <Phone className="w-3 h-3" /> {ligacaoShort(lig)}
                       </span>
                     </td>
-                    <td className="p-3 whitespace-nowrap">
+                    <td data-label="Indicacao" className="p-3 whitespace-nowrap">
                       <span
                         className="chip"
                         style={{
@@ -288,7 +288,7 @@ export default function VendasClient({
                         <UserPlus className="w-3 h-3" /> {indicacaoShort(ind)}
                       </span>
                     </td>
-                    <td className="p-3 text-white/70 text-xs max-w-[240px]">
+                    <td data-label="Observacao" className="p-3 text-white/70 text-xs max-w-[240px]">
                       {s.observacao || <span className="text-white/30">—</span>}
                     </td>
                   </tr>

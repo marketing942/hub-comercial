@@ -148,7 +148,7 @@ export default function DiretoClient({
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-stack w-full text-sm">
             <thead className="text-[10px] uppercase tracking-wider text-white/40 bg-panel2/60">
               <tr className="text-left">
                 <th className="p-3">Data</th>
@@ -296,8 +296,8 @@ function Row({
     const isIA = sale.channel === "ia";
     return (
       <tr className="border-t border-border hover:bg-panel2/30">
-        <td className="p-3 whitespace-nowrap">{new Date(sale.sale_date + "T00:00").toLocaleDateString("pt-BR")}</td>
-        <td className="p-3">
+        <td data-label="Data" className="p-3 whitespace-nowrap">{new Date(sale.sale_date + "T00:00").toLocaleDateString("pt-BR")}</td>
+        <td data-label="Canal" className="p-3">
           {isIA ? (
             <span className="chip" style={{ background: "#b99be022", color: "#b99be0" }}>
               <Bot className="w-3 h-3" /> IA
@@ -308,11 +308,11 @@ function Row({
             </span>
           )}
         </td>
-        <td className="p-3">{productLabel(sale.product_line)}</td>
-        <td className="p-3 text-right font-semibold whitespace-nowrap">{BRL.format(Number(sale.valor))}</td>
-        <td className="p-3 text-right">{sale.quantidade}</td>
-        <td className="p-3 text-white/60 text-xs max-w-[220px] truncate">{sale.observacao || "-"}</td>
-        <td className="p-3 text-right">
+        <td data-label="Categoria" className="p-3">{productLabel(sale.product_line)}</td>
+        <td data-label="Valor" className="p-3 text-right font-semibold whitespace-nowrap">{BRL.format(Number(sale.valor))}</td>
+        <td data-label="Qtd" className="p-3 text-right">{sale.quantidade}</td>
+        <td data-label="Obs" className="p-3 text-white/60 text-xs max-w-[220px] truncate">{sale.observacao || "-"}</td>
+        <td data-label="" className="p-3 text-right">
           <button className="btn-ghost h-8 px-2 mr-1" onClick={() => setEdit(true)}>
             <Pencil className="w-3.5 h-3.5" />
           </button>
@@ -326,10 +326,10 @@ function Row({
 
   return (
     <tr className="border-t border-border bg-panel2/40">
-      <td className="p-2">
+      <td data-label="Data" className="p-2">
         <input type="date" className="input h-9" value={date} onChange={(e) => setDate(e.target.value)} />
       </td>
-      <td className="p-2">
+      <td data-label="Canal" className="p-2">
         <div className="flex flex-col gap-1">
           <select
             className="input h-9 text-xs"
@@ -351,23 +351,23 @@ function Row({
           )}
         </div>
       </td>
-      <td className="p-2">
+      <td data-label="Categoria" className="p-2">
         <select className="input h-9" value={line} onChange={(e) => setLine(e.target.value)}>
           {lineOptions.map((l) => (
             <option key={l.id} value={l.id}>{l.label}</option>
           ))}
         </select>
       </td>
-      <td className="p-2">
+      <td data-label="Valor" className="p-2">
         <NumberField step="0.01" className="input h-9" value={valor} onChange={setValor} />
       </td>
-      <td className="p-2">
+      <td data-label="Qtd" className="p-2">
         <NumberField className="input h-9" value={qtd} onChange={setQtd} />
       </td>
-      <td className="p-2">
+      <td data-label="Obs" className="p-2">
         <input className="input h-9" value={obs} onChange={(e) => setObs(e.target.value)} />
       </td>
-      <td className="p-2 text-right whitespace-nowrap">
+      <td data-label="" className="p-2 text-right whitespace-nowrap">
         <button className="btn-primary h-8 px-2 mr-1" onClick={save}>
           <Check className="w-3.5 h-3.5" />
         </button>

@@ -107,7 +107,7 @@ export default function SalesClient({ seller, initial }: { seller: Seller; initi
             unidade{totalQtd === 1 ? "" : "s"}
           </div>
         </div>
-        <table className="w-full text-sm">
+        <table className="table-stack w-full text-sm">
           <thead className="text-xs uppercase tracking-wider text-white/40 bg-panel2">
             <tr className="text-left">
               <th className="p-3">Data</th>
@@ -218,16 +218,16 @@ function Row({
     const ind = sale.indicacao_status || "sem_indicacao";
     return (
       <tr className="border-t border-border">
-        <td className="p-3">{new Date(sale.sale_date + "T00:00").toLocaleDateString("pt-BR")}</td>
-        <td className="p-3">{productLabel(sale.product_line)}</td>
-        <td className="p-3">
+        <td data-label="Data" className="p-3">{new Date(sale.sale_date + "T00:00").toLocaleDateString("pt-BR")}</td>
+        <td data-label="Produto" className="p-3">{productLabel(sale.product_line)}</td>
+        <td data-label="Cliente" className="p-3">
           {sale.cliente_nome
             ? <span className="text-white/90">{sale.cliente_nome}</span>
             : <span className="text-white/30 text-xs">—</span>}
         </td>
-        <td className="p-3 font-semibold">{BRL.format(Number(sale.valor))}</td>
-        <td className="p-3">{sale.quantidade}</td>
-        <td className="p-3">
+        <td data-label="Valor" className="p-3 font-semibold">{BRL.format(Number(sale.valor))}</td>
+        <td data-label="Qtd" className="p-3">{sale.quantidade}</td>
+        <td data-label="Origem" className="p-3">
           <span
             className="chip"
             style={{
@@ -238,7 +238,7 @@ function Row({
             <Phone className="w-3 h-3" /> {ligacaoShort(lig)}
           </span>
         </td>
-        <td className="p-3">
+        <td data-label="Indicacao" className="p-3">
           <span
             className="chip"
             style={{
@@ -249,7 +249,7 @@ function Row({
             <UserPlus className="w-3 h-3" /> {indicacaoShort(ind)}
           </span>
         </td>
-        <td className="p-3 text-right">
+        <td data-label="" className="p-3 text-right">
           <button className="btn-ghost h-8 px-2 mr-1" onClick={() => setEdit(true)}>
             <Pencil className="w-3.5 h-3.5" />
           </button>
@@ -263,10 +263,10 @@ function Row({
 
   return (
     <tr className="border-t border-border bg-panel2/40">
-      <td className="p-2">
+      <td data-label="Data" className="p-2">
         <input type="date" className="input h-9" value={date} max={todayISORecife()} onChange={(e) => setDate(e.target.value)} />
       </td>
-      <td className="p-2">
+      <td data-label="Produto" className="p-2">
         <select className="input h-9" value={line} onChange={(e) => setLine(e.target.value)}>
           {lines.map((l) => (
             <option key={l.id} value={l.id}>
@@ -275,7 +275,7 @@ function Row({
           ))}
         </select>
       </td>
-      <td className="p-2">
+      <td data-label="Cliente" className="p-2">
         <input
           type="text"
           className="input h-9"
@@ -285,13 +285,13 @@ function Row({
           maxLength={200}
         />
       </td>
-      <td className="p-2">
+      <td data-label="Valor" className="p-2">
         <NumberField step="0.01" className="input h-9" value={valor} onChange={setValor} />
       </td>
-      <td className="p-2">
+      <td data-label="Qtd" className="p-2">
         <NumberField className="input h-9" value={qtd} onChange={setQtd} />
       </td>
-      <td className="p-2">
+      <td data-label="Origem" className="p-2">
         <select className="input h-9" value={ligacao} onChange={(e) => setLigacao(e.target.value)}>
           {LIGACAO_STATUSES.map((l) => (
             <option key={l.id} value={l.id}>
@@ -300,7 +300,7 @@ function Row({
           ))}
         </select>
       </td>
-      <td className="p-2">
+      <td data-label="Indicacao" className="p-2">
         <select className="input h-9" value={indicacao} onChange={(e) => setIndicacao(e.target.value)}>
           {INDICACAO_STATUSES.map((l) => (
             <option key={l.id} value={l.id}>
@@ -309,7 +309,7 @@ function Row({
           ))}
         </select>
       </td>
-      <td className="p-2 text-right">
+      <td data-label="" className="p-2 text-right">
         <button className="btn-primary h-8 px-2 mr-1" onClick={save}>
           <Check className="w-3.5 h-3.5" />
         </button>

@@ -183,9 +183,9 @@ export default async function GamificationPage({
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wider text-white/40 bg-panel2">
                 <tr className="text-left">
-                  <th className="px-4 py-2">% Meta Ind.</th>
+                  <th className="px-3 sm:px-4 py-2">% Meta Ind.</th>
                   <th className="px-4 py-2">% Comissao</th>
-                  <th className="px-4 py-2 text-right">Se aplicasse no seu realizado</th>
+                  <th className="px-4 py-2 text-right max-sm:hidden">Se aplicasse no seu realizado</th>
                   <th className="px-4 py-2 text-right">Status</th>
                 </tr>
               </thead>
@@ -203,10 +203,10 @@ export default async function GamificationPage({
                       <td className="px-4 py-2 font-semibold" style={{ color: reached ? color : undefined }}>
                         {t.commission_pct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%
                       </td>
-                      <td className="px-4 py-2 text-right text-white/70">{BRL.format(wouldPay)}</td>
+                      <td className="px-4 py-2 text-right text-white/70 max-sm:hidden">{BRL.format(wouldPay)}</td>
                       <td className="px-4 py-2 text-right">
                         {isCurrent ? (
-                          <span className="chip" style={{ background: color + "22", color }}>
+                          <span className="chip whitespace-nowrap" style={{ background: color + "22", color }}>
                             <Flame className="w-3 h-3" /> Voce esta aqui
                           </span>
                         ) : reached ? (

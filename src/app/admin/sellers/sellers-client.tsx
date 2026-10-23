@@ -212,7 +212,7 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
       {/* Tabela unica */}
       <div className="card p-0 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="table-stack w-full text-sm">
             <thead className="text-[10px] uppercase tracking-wider text-white/40 bg-panel2/60">
               <tr className="text-left">
                 <th className="p-3">Nome</th>
@@ -234,7 +234,7 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
                 const sBus = busOf(s);
                 return (
                   <tr key={s.id} className="border-t border-border hover:bg-panel2/30">
-                    <td className="p-3">
+                    <td data-label="Nome" className="p-3">
                       <input
                         defaultValue={s.name}
                         onBlur={(e) =>
@@ -245,7 +245,7 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
                         className="bg-transparent border-b border-transparent hover:border-border focus:border-accent focus:outline-none font-medium w-full max-w-[260px]"
                       />
                     </td>
-                    <td className="p-3">
+                    <td data-label="Atua em" className="p-3">
                       <div className="flex gap-1.5 flex-wrap">
                         {ALL_BUS.map((b) => {
                           const active = sBus.includes(b);
@@ -275,7 +275,7 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
                         })}
                       </div>
                     </td>
-                    <td className="p-3">
+                    <td data-label="Status" className="p-3">
                       <span
                         className={`chip ${
                           s.active
@@ -286,14 +286,14 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
                         {s.active ? "Ativo" : "Inativo"}
                       </span>
                     </td>
-                    <td className="p-3">
+                    <td data-label="Senha" className="p-3">
                       {s.has_password ? (
                         <span className="chip bg-success/15 text-success">Definida</span>
                       ) : (
                         <span className="chip bg-warning/15 text-warning">Nao definida</span>
                       )}
                     </td>
-                    <td className="p-3 text-right">
+                    <td data-label="" className="p-3 text-right">
                       <button
                         className="btn-ghost h-8 px-2 mr-1"
                         onClick={() => setPwTarget(s)}

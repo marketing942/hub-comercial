@@ -105,14 +105,14 @@ export default function DashboardCarousel({
     <div className="space-y-5">
       {/* Barra de contexto: abas das BUs (sublinhado) + periodo e acoes */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 border-b border-[var(--hair)]">
-        <div className="flex items-end gap-1 overflow-x-auto">
+        <div className="flex items-end gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
           {slides.map((s, i) => {
             const active = i === idx;
             return (
               <button
                 key={s.key}
                 onClick={() => jump(i)}
-                className={`relative px-4 pt-2 pb-3 font-ui font-bold uppercase tracking-[0.14em] text-[13px] whitespace-nowrap transition ${
+                className={`relative px-4 pt-3 pb-3.5 sm:pt-2 sm:pb-3 shrink-0 font-ui font-bold uppercase tracking-[0.14em] text-[13px] whitespace-nowrap transition ${
                   active ? "text-accent" : "text-white/50 hover:text-white"
                 }`}
               >
@@ -160,7 +160,7 @@ export default function DashboardCarousel({
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
-            className="btn-ghost h-9 w-9 !p-0"
+            className="btn-ghost h-9 w-9 !p-0 max-sm:hidden"
             onClick={toggleFull}
             title={full ? "Sair de tela cheia" : "Tela cheia (TV)"}
             aria-label="Tela cheia"

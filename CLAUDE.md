@@ -96,6 +96,14 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 - ⚠️ Em `next dev` as páginas **não hidratam** (a CSP do projeto bloqueia `unsafe-eval`). Para testar UI use `next build && next start`.
 - As tabelas do painel antigo (`cac_data`, `breakeven_data`, `metas_data`, `pace_data`, `realizado_data`) continuam no banco mas **não são usadas pelo Hub**; CAC e breakeven foram descartados.
 
+## 6.2 Mobile (<640px, breakpoint `sm` do Tailwind)
+
+- Alvos de toque ≥ 44px: em `globals.css` (bloco "Mobile") `.btn` ganha `min-height: 2.75rem` e os botões-ícone `h-8/h-9` viram 44px; `.input`/`select` usam fonte 16px (evita o zoom do iOS). Não use `h-8`/`h-9` fixos achando que valem no celular — o CSS sobrepõe.
+- **Tabela → cartões**: coloque `className="table-stack …"` na `<table>` e `data-label="Rótulo"` em cada `<td>` (vazio `""` para a coluna de ações). No celular o `thead` some e cada `<tr>` vira um cartão "rótulo … valor". Aplicado em Todas as Vendas, Vendedores, Direto/IA, Comissões (resumo), Leads e Minhas Vendas. Tabelas largas de planilha (aba Ano) continuam com rolagem horizontal + 1ª coluna fixa.
+- `ConfiguracoesSubnav` é uma linha única rolável (`no-scrollbar`) que centraliza a aba ativa; fica `sticky top-14` (abaixo da barra do topo).
+- Aviso de venda nova: largura total e no máximo 2 empilhados no celular (`.sale-toasts`). Tela cheia (TV) fica escondida no celular. Gráfico diário vai a 300px de altura (`max-sm:!h-[300px]`).
+- Teste mobile: `next build && next start` + Playwright com `isMobile`/`hasTouch` e viewport 390×844; confira também `scrollWidth <= clientWidth` (sem rolagem horizontal da página).
+
 ## 7. Pendências de identidade (não bloqueiam)
 
 - `src/app/icon.svg`: troféu dourado correto, mas as alças ainda estão em lima `#a3e635` (resquício do tema antigo).

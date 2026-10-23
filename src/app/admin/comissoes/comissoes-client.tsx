@@ -295,7 +295,7 @@ function BoardView({ board }: { board: Board }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
+        <table className="table-stack w-full text-sm min-w-[900px]">
           <thead className="text-[10px] uppercase tracking-wider text-white/40 bg-panel2/60">
             <tr className="text-left">
               <th className="py-2 pl-4">Vendedor</th>
@@ -320,26 +320,26 @@ function BoardView({ board }: { board: Board }) {
               const podiumMedal = r.podium === 1 ? "🥇" : r.podium === 2 ? "🥈" : r.podium === 3 ? "🥉" : "";
               return (
                 <tr key={r.sellerId} className="border-t border-border hover:bg-panel2/30">
-                  <td className="py-2 pl-4 font-medium">{r.sellerName}</td>
-                  <td className="text-right whitespace-nowrap">{BRL.format(r.realizado)}</td>
-                  <td className="text-right text-white/60 whitespace-nowrap">{BRL.format(r.meta)}</td>
-                  <td className="text-right font-semibold whitespace-nowrap" style={{ color: r.pctMeta >= 100 ? COLOR.ok : color }}>
+                  <td data-label="Vendedor" className="py-2 pl-4 font-medium">{r.sellerName}</td>
+                  <td data-label="Realizado" className="text-right whitespace-nowrap">{BRL.format(r.realizado)}</td>
+                  <td data-label="Meta" className="text-right text-white/60 whitespace-nowrap">{BRL.format(r.meta)}</td>
+                  <td data-label="% Meta" className="text-right font-semibold whitespace-nowrap" style={{ color: r.pctMeta >= 100 ? COLOR.ok : color }}>
                     {fmtPct(r.pctMeta)}
                   </td>
-                  <td className="text-right whitespace-nowrap">
+                  <td data-label="Tier" className="text-right whitespace-nowrap">
                     {r.tierPct ? (
                       <span className="chip" style={{ background: color + "22", color }}>{r.tierPct}%</span>
                     ) : (
                       <span className="text-xs text-white/40">—</span>
                     )}
                   </td>
-                  <td className="text-right whitespace-nowrap">
+                  <td data-label="% Comm" className="text-right whitespace-nowrap">
                     {r.commissionPct > 0 ? `${r.commissionPct.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%` : "—"}
                   </td>
-                  <td className="text-right font-semibold whitespace-nowrap" style={{ color: r.commissionValue > 0 ? color : "#64748b" }}>
+                  <td data-label="Comissao" className="text-right font-semibold whitespace-nowrap" style={{ color: r.commissionValue > 0 ? color : "#64748b" }}>
                     {BRL.format(r.commissionValue)}
                   </td>
-                  <td className="text-right whitespace-nowrap">
+                  <td data-label="Podio" className="text-right whitespace-nowrap">
                     {r.podium ? (
                       <span className="inline-flex items-center gap-1">
                         <span>{podiumMedal}</span>
@@ -353,7 +353,7 @@ function BoardView({ board }: { board: Board }) {
                       <span className="text-xs text-white/30">—</span>
                     )}
                   </td>
-                  <td className="text-right pr-4 font-bold whitespace-nowrap" style={{ color: r.total > 0 ? COLOR.ok : "#64748b" }}>
+                  <td data-label="Total" className="text-right pr-4 font-bold whitespace-nowrap" style={{ color: r.total > 0 ? COLOR.ok : "#64748b" }}>
                     {BRL.format(r.total)}
                   </td>
                 </tr>

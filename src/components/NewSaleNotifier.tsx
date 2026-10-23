@@ -114,7 +114,7 @@ export default function NewSaleNotifier() {
 
   return (
     <div
-      className="fixed top-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"
+      className="sale-toasts fixed top-16 sm:top-4 left-3 right-3 sm:left-auto sm:right-4 z-[60] flex flex-col gap-2 pointer-events-none"
       aria-live="polite"
     >
       {toasts.map((t) => (
@@ -127,7 +127,7 @@ export default function NewSaleNotifier() {
 function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   return (
     <div
-      className="pointer-events-auto w-[320px] rounded-2xl shadow-glow border overflow-hidden animate-in slide-in-from-right duration-200 cursor-pointer"
+      className="pointer-events-auto w-full sm:w-[320px] rounded-2xl shadow-glow border overflow-hidden animate-in slide-in-from-right duration-200 cursor-pointer"
       style={{
         // Fundo translucido: o dashboard continua visivel por tras (com leve desfoque).
         background: "linear-gradient(135deg, rgba(175,146,86,0.20), rgba(17,17,21,0.55))",
@@ -157,7 +157,7 @@ function ToastCard({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         </div>
         <button
           type="button"
-          className="shrink-0 w-6 h-6 grid place-items-center rounded-md hover:bg-white/10 text-white/70 hover:text-white"
+          className="shrink-0 w-8 h-8 sm:w-6 sm:h-6 grid place-items-center rounded-md hover:bg-white/10 text-white/70 hover:text-white"
           onClick={(e) => {
             e.stopPropagation();
             onClose();

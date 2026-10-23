@@ -141,3 +141,44 @@ html.has-crosshair, html.has-crosshair * { cursor: none !important; }
 .crosshair.is-fire .crosshair-art { transform: scale(.72); }
 .crosshair.is-lock.is-fire .crosshair-art { transform: rotate(45deg) scale(.72); }
 @media (prefers-reduced-motion: reduce) { .crosshair-art { transition: none; } }
+
+/* ===== Mobile (<640px): alvos de toque >= 44px, inputs sem zoom do iOS, tabelas empilhadas ===== */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (max-width: 639px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { -webkit-tap-highlight-color: transparent; }
+  .btn { min-height: 2.75rem; }
+  .btn.h-8, .btn.h-9 { height: 2.75rem !important; min-width: 2.75rem; }
+  .btn.w-9 { width: 2.75rem !important; }
+  .btn.px-2 { padding-left: .75rem; padding-right: .75rem; }
+  /* 16px evita o zoom automatico ao focar o campo no iPhone */
+  .input, input.input, select.input, textarea.input { font-size: 16px; min-height: 2.75rem; }
+  .cell { padding: .75rem !important; }
+  .kpi-label { font-size: 10.5px; }
+
+  /* Tabela vira lista de cartoes: cada <tr> um cartao, cada <td> "rotulo ..... valor".
+     Use class="table-stack" na <table> e data-label="..." em cada <td>. */
+  .table-stack { min-width: 0 !important; }
+  .table-stack thead { display: none; }
+  .table-stack, .table-stack tbody { display: block; width: 100%; }
+  .table-stack tr { display: block; padding: .625rem .875rem; }
+  .table-stack td {
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+    padding: .3rem 0 !important; text-align: right; white-space: normal !important;
+    max-width: none !important; min-height: 1.75rem;
+  }
+  .table-stack td::before {
+    content: attr(data-label); flex: 0 0 auto; max-width: 42%; text-align: left;
+    font-family: var(--font-ui), sans-serif; font-weight: 700; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.45);
+  }
+  .table-stack td[data-label=""]::before, .table-stack td:not([data-label])::before { content: none; }
+  .table-stack td[data-label=""] { justify-content: flex-end; gap: .5rem; padding-top: .5rem !important; }
+  .table-stack td[colspan] { display: block; text-align: center; }
+  .table-stack td > input, .table-stack td > select { flex: 1 1 auto; min-width: 0; width: auto; }
+  .table-stack td > .flex { justify-content: flex-end; }
+  /* no maximo 2 avisos de venda empilhados no celular */
+  .sale-toasts > :nth-last-child(n+3) { display: none; }
+}

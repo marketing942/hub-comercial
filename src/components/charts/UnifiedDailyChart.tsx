@@ -206,7 +206,7 @@ export default function UnifiedDailyChart({
         {leads && <LegendItem kind="dot" color={leads.color} label={leads.label} />}
       </div>
 
-      <div className={fill ? "flex-1 min-h-[280px] max-h-[62vh]" : undefined} style={fill ? undefined : { height }}>
+      <div className={fill ? "flex-1 min-h-[280px] max-h-[62vh]" : "max-sm:!h-[300px]"} style={fill ? undefined : { height }}>
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={{ top: 18, left: 0, right: hasRight ? 8 : 0, bottom: 4 }} barCategoryGap="22%">
             <defs>
