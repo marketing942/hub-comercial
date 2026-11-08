@@ -365,3 +365,12 @@ create table if not exists public.year_realizado (
   primary key (bu, year, month)
 );
 alter table public.year_realizado enable row level security;
+
+-- ---------- Indices de desempenho (ver supabase/perf-indexes.sql) ----------
+create index if not exists sales_sale_date_idx          on public.sales (sale_date);
+create index if not exists sales_seller_sale_date_idx   on public.sales (seller_id, sale_date);
+create index if not exists sales_created_at_idx         on public.sales (created_at);
+create index if not exists direct_sales_sale_date_idx   on public.direct_sales (sale_date);
+create index if not exists daily_leads_date_idx         on public.daily_leads (date);
+create index if not exists monthly_goals_period_idx     on public.monthly_goals (year, month);
+create index if not exists product_goals_period_idx     on public.product_goals (year, month);

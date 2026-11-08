@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase";
 import { COLEGIO_MATRICULAS_IDS, type BU } from "./products";
 import { isBusinessDay, nowRecife } from "./calc";
+import { buListOf, fetchAll, listSellers } from "./data";
 
 export type LongTermGoal = {
   id: string;
@@ -110,17 +111,9 @@ export async function computeLongTermProgress(
       : { y: goal.end_year, m: goal.end_month + 1 };
   const dayAfterLast = `${endNext.y}-${String(endNext.m).padStart(2, "0")}-01`;
 
-  // Vendedores da BU (pra filtrar sales)
-  const { data: sellersRows } = await supabaseAdmin
-    .from("sellers")
-    .select("id, bu, bus")
-    .eq("active", true);
-  const sellerIds = ((sellersRows as any[]) || [])
-    .filter((s) => {
-      const arr: string[] =
-        Array.isArray(s.bus) && s.bus.length > 0 ? s.bus : [s.bu];
-      return arr.includes(goal.bu);
-    })
+  // Vendedores da BU (pra filtrar sales). Lista compartilhada na requisicao.
+  const sellerIds = (await listSellers({ onlyActive: true }))
+    .filter((s) => buListOf(s).includes(goal.bu))
     .map((s) => s.id);
 
   const productIds = relevantProductIds(goal.bu);
@@ -147,14 +140,18 @@ export async function computeLongTermProgress(
     // Pra manter simples: usa <= todayISO em vez de < dayAfter.
     const upperLteISO =
       todayISO < dayAfterLast ? todayISO : lastDayOfMonth(goal.end_year, goal.end_month);
-    const { data: salesRows } = await supabaseAdmin
-      .from("sales")
-      .select("quantidade")
-      .in("seller_id", sellerIds)
-      .in("product_line", productIds)
-      .gte("sale_date", firstDay)
-      .lte("sale_date", upperLteISO);
-    novasNoPeriodo = ((salesRows as any[]) || []).reduce(
+    // Periodo longo (varios meses): pagina pra nao cortar em 1000 linhas.
+    const salesRows = await fetchAll<{ quantidade: number }>("sales(long-term)", () =>
+      supabaseAdmin
+        .from("sales")
+        .select("quantidade")
+        .in("seller_id", sellerIds)
+        .in("product_line", productIds)
+        .gte("sale_date", firstDay)
+        .lte("sale_date", upperLteISO)
+        .order("id")
+    );
+    novasNoPeriodo = salesRows.reduce(
       (sum, r) => sum + Number(r.quantidade || 0),
       0
     );

@@ -16,7 +16,7 @@ import { isQtdPrimary, type BU } from "@/lib/products";
 import BULogo from "@/components/BULogo";
 import Cell from "@/components/StatCell";
 import ProgressBar from "@/components/ProgressBar";
-import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChart";
+import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import AvatarUploader from "@/components/AvatarUploader";
 import NewSaleButton from "./sales/NewSaleButton";
 import ChangePasswordButton from "@/components/ChangePasswordButton";

@@ -104,6 +104,17 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 - Aviso de venda nova: largura total e no máximo 2 empilhados no celular (`.sale-toasts`). Tela cheia (TV) fica escondida no celular. Gráfico diário vai a 300px de altura (`max-sm:!h-[300px]`).
 - Teste mobile: `next build && next start` + Playwright com `isMobile`/`hasTouch` e viewport 390×844; confira também `scrollWidth <= clientWidth` (sem rolagem horizontal da página).
 
+## 6.3 Desempenho (leitura de dados e carregamento)
+
+- **Camada de dados em lote** (`src/lib/data.ts`): as telas leem o mês em poucas consultas (`loadMonthSales`, `loadMonthLeads`, `loadMonthGoals`, `loadMonthDirect`, `loadSellers`) deduplicadas por requisição com `React.cache` (layout + página + funções compartilham o resultado) e agregam em memória. **Não faça consulta por vendedor/BU em laço** (antes: ~120 consultas no dashboard, ~85 em Comissões/Gamificação; agora 15 / 9).
+- **Limite de 1000 linhas do Supabase**: consulta que pode passar disso usa `fetchAll(...)` (pagina com `.range()` + `.order("id")`). Consulta direta sem paginar corta em silêncio.
+- Vendedor único: `sellerMonthRaw` (vendas de todas as BUs + leads + metas numa leva) alimenta `statsForSellerInBu` e `sellerSeries`.
+- **`loading.tsx`** em `dashboard/`, `admin/` e `seller/` mostra o esqueleto (`PageSkeleton`) na hora e permite o prefetch das rotas; a barra do topo não some ao navegar.
+- **Recharts em chunk separado**: use `UnifiedDailyChartLazy` / `OriginDonutLazy` (`next/dynamic`, `ssr:false`) em vez de importar o gráfico direto. O carrossel do Dashboard TV monta **só o slide ativo**.
+- Aviso de venda nova (`NewSaleNotifier`) só consulta com a aba visível. Listas longas renderizam aos poucos (ex.: Todas as Vendas: 100 por vez, “Mostrar mais”).
+- Índices: `supabase/perf-indexes.sql` (idempotente; também no fim do `schema.sql`) — rodar uma vez no SQL Editor.
+- Medir: `next build && next start` com um PostgREST simulado com latência fixa e contagem de requisições; comparar saída antiga × nova da camada de dados antes de trocar consultas.
+
 ## 7. Pendências de identidade (não bloqueiam)
 
 - `src/app/icon.svg`: troféu dourado correto, mas as alças ainda estão em lima `#a3e635` (resquício do tema antigo).

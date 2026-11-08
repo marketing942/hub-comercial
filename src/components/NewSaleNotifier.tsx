@@ -76,11 +76,18 @@ export default function NewSaleNotifier() {
         // silencioso — proximo tick tenta de novo
       }
     }
-    tick();
-    const id = setInterval(tick, POLL_MS);
+    // Aba oculta nao consulta (antes cada aba/TV aberta batia no banco a cada 7s
+    // mesmo em segundo plano); ao voltar, busca na hora o que perdeu.
+    const run = () => {
+      if (!document.hidden) void tick();
+    };
+    run();
+    const id = setInterval(run, POLL_MS);
+    document.addEventListener("visibilitychange", run);
     return () => {
       alive = false;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", run);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

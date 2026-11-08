@@ -172,17 +172,15 @@ export default function DashboardCarousel({
 
       {/* Slides */}
       <div className="relative">
-        {slides.map((s, i) => (
-          <div
-            key={s.key}
-            className={`transition-opacity duration-500 ${
-              i === idx ? "opacity-100" : "opacity-0 hidden"
-            }`}
-            aria-hidden={i !== idx}
-          >
-            {s.node}
-          </div>
-        ))}
+        {/* Monta so o slide ativo: antes todos ficavam montados (escondidos) e cada um
+            rodava o proprio grafico/medicoes em segundo plano. */}
+        {slides.map((s, i) =>
+          i === idx ? (
+            <div key={s.key} className="animate-in fade-in duration-500">
+              {s.node}
+            </div>
+          ) : null
+        )}
       </div>
 
       <div className="text-center text-[11px] text-white/30">

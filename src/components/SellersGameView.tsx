@@ -3,7 +3,7 @@ import type { LigacaoRow, IndicacaoRow } from "@/lib/data";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
 import { BU_COLOR, BU_LABEL, COLOR, PANICO_BADGE } from "@/lib/brand";
 import { isQtdPrimary, ALL_BUS, LIGACAO_STATUSES, INDICACAO_STATUSES, type BU } from "@/lib/products";
-import OriginDonut from "@/components/OriginDonut";
+import OriginDonut from "@/components/OriginDonutLazy";
 import ProgressBar from "@/components/ProgressBar";
 import Avatar from "@/components/Avatar";
 import { Crown } from "lucide-react";

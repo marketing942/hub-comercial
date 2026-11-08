@@ -2,7 +2,7 @@ import type { DashboardSnapshot } from "@/lib/data";
 import { BRL, fmtInt, fmtPct, paceProjection } from "@/lib/calc";
 import { BU_COLOR, BU_LABEL, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary } from "@/lib/products";
-import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChart";
+import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
 import ColegioTurmasBreakdown from "@/components/ColegioTurmasBreakdown";
 import UniciveCategoriasBreakdown from "@/components/UniciveCategoriasBreakdown";

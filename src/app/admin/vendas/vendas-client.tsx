@@ -1,5 +1,5 @@
 "use client";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Phone, UserPlus, User, Filter, Download } from "lucide-react";
 import {
@@ -59,6 +59,10 @@ export default function VendasClient({
 }) {
   const router = useRouter();
   const params = useSearchParams();
+  // Renderiza as linhas aos poucos: um mes inteiro (centenas/milhares de vendas)
+  // virava um DOM e um HTML enormes. Totais e CSV continuam usando a lista completa.
+  const PAGE_SIZE = 100;
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
   const sellerById = useMemo(() => {
     const m = new Map<string, Seller>();
@@ -230,7 +234,7 @@ export default function VendasClient({
                   </td>
                 </tr>
               )}
-              {sales.map((s) => {
+              {sales.slice(0, visible).map((s) => {
                 const vendedor = sellerById.get(s.seller_id);
                 const b = buFromProductLine(s.product_line);
                 const lig = s.ligacao_status || "sem_ligacao";
@@ -297,6 +301,21 @@ export default function VendasClient({
             </tbody>
           </table>
         </div>
+        {sales.length > visible && (
+          <div className="p-3 border-t border-border flex items-center justify-between gap-3 text-xs text-white/60">
+            <span>
+              Mostrando {fmtInt.format(visible)} de {fmtInt.format(sales.length)} vendas
+            </span>
+            <div className="flex gap-2">
+              <button className="btn-ghost" onClick={() => setVisible((v) => v + PAGE_SIZE)}>
+                Mostrar mais {PAGE_SIZE}
+              </button>
+              <button className="btn-ghost" onClick={() => setVisible(sales.length)}>
+                Mostrar todas
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

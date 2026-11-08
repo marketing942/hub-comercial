@@ -27,10 +27,18 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "raw.githubusercontent.com" },
     ],
+    // Logos das BUs quase nunca mudam: guarda a versao otimizada por 1 dia
+    // (o padrao e 60s, o que refaz o download/otimizacao varias vezes por hora).
+    minimumCacheTTL: 86400,
+  },
+  experimental: {
+    // Importa so os icones/graficos usados em vez do pacote inteiro.
+    optimizePackageImports: ["lucide-react", "recharts"],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

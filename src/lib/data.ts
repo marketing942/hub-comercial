@@ -1,3 +1,4 @@
+import * as React from "react";
 import { supabaseAdmin } from "./supabase";
 import {
   computeSellerStats,
@@ -13,6 +14,166 @@ import {
   type SellerStats,
 } from "./calc";
 import { productLabel, productIdsFor, buFromProductLine, isQtdPrimary } from "./products";
+
+// ---------------------------------------------------------------------------
+// Cache por requisicao + leitura em lote
+//
+// Antes, cada funcao abaixo fazia as proprias consultas ao Supabase: o painel
+// (dashboard TV) disparava ~120 consultas e as telas de Comissoes/Gamificacao
+// ~85 a cada abertura (uma rodada de 5 consultas POR vendedor/BU). Agora cada
+// conjunto de dados do mes e buscado UMA vez por requisicao (React `cache`,
+// deduplicado entre layout, pagina e funcoes) e as agregacoes sao feitas em
+// memoria. Fora do React (scripts/testes) `cache` nao existe e vira passthrough.
+// ---------------------------------------------------------------------------
+const memo: <A extends any[], R>(fn: (...a: A) => R) => (...a: A) => R =
+  (React as any).cache || ((fn: any) => fn);
+
+const PAGE = 1000; // limite padrao de linhas por resposta do PostgREST/Supabase
+
+// Le TODAS as linhas de uma consulta paginando com .range(). Sem isso o Supabase
+// corta silenciosamente em 1000 linhas (um mes de vendas da empresa passa disso).
+export async function fetchAll<T>(label: string, build: () => any, throwOnError = false): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build().range(from, from + PAGE - 1);
+    if (error) {
+      if (throwOnError) throw new Error(error.message);
+      console.error(`fetchAll(${label}) falhou:`, error.message);
+      break;
+    }
+    const rows = ((data as T[]) || []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
+function monthRange(year: number, month: number) {
+  const mm = String(month).padStart(2, "0");
+  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+  return {
+    firstDay: `${year}-${mm}-01`,
+    lastDay: `${next.y}-${String(next.m).padStart(2, "0")}-01`,
+  };
+}
+
+type BU3 = "cppem" | "unicive" | "colegio_cppem";
+type SaleLite = {
+  id: string;
+  seller_id: string;
+  sale_date: string;
+  product_line: string;
+  valor: number;
+  quantidade: number;
+  ligacao_status?: string | null;
+  indicacao_status?: string | null;
+};
+const SALE_COLS = "id, seller_id, sale_date, product_line, valor, quantidade, ligacao_status, indicacao_status";
+
+// Todas as vendas do mes (todos os vendedores/BUs).
+const loadMonthSales = memo(async (year: number, month: number): Promise<SaleLite[]> => {
+  const { firstDay, lastDay } = monthRange(year, month);
+  const run = (cols: string, strict: boolean) =>
+    fetchAll<SaleLite>(
+      "sales",
+      () =>
+        supabaseAdmin
+          .from("sales")
+          .select(cols)
+          .gte("sale_date", firstDay)
+          .lt("sale_date", lastDay)
+          .order("id"),
+      strict
+    );
+  try {
+    return await run(SALE_COLS, true);
+  } catch (e) {
+    // Banco sem alguma coluna nova (migracao pendente): le tudo e degrada.
+    console.warn("sales com colunas explicitas falhou — fallback select(*):", (e as Error).message);
+    return run("*", false);
+  }
+});
+
+const loadMonthLeads = memo(async (year: number, month: number) => {
+  const { firstDay, lastDay } = monthRange(year, month);
+  return fetchAll<{ seller_id: string; date: string; qty: number }>("daily_leads", () =>
+    supabaseAdmin
+      .from("daily_leads")
+      .select("seller_id, date, qty")
+      .gte("date", firstDay)
+      .lt("date", lastDay)
+      .order("id")
+  );
+});
+
+type ProductGoalRow = { seller_id: string; product_line: string; valor_meta: number; quantidade_meta: number };
+type MonthlyGoalRow = {
+  seller_id: string;
+  bu: BU3;
+  ticket_medio_meta: number;
+  taxa_conversao_meta: number;
+  valor_meta: number;
+  quantidade_meta: number;
+  leads_meta: number;
+};
+
+// Metas do mes: por vendedor/produto, por vendedor/BU, da BU e por categoria da BU.
+const loadMonthGoals = memo(async (year: number, month: number) => {
+  const [pg, mg, bm, bpg] = await Promise.all([
+    supabaseAdmin
+      .from("product_goals")
+      .select("seller_id, product_line, valor_meta, quantidade_meta")
+      .eq("year", year)
+      .eq("month", month),
+    supabaseAdmin
+      .from("monthly_goals")
+      .select("seller_id, bu, ticket_medio_meta, taxa_conversao_meta, valor_meta, quantidade_meta, leads_meta")
+      .eq("year", year)
+      .eq("month", month),
+    supabaseAdmin
+      .from("bu_meta")
+      .select("bu, leads_meta, taxa_conversao_meta")
+      .eq("year", year)
+      .eq("month", month),
+    supabaseAdmin
+      .from("bu_product_goals")
+      .select("bu, product_line, valor_meta, quantidade_meta")
+      .eq("year", year)
+      .eq("month", month),
+  ]);
+  return {
+    productGoals: ((pg.data as any[]) || []) as ProductGoalRow[],
+    monthlyGoals: ((mg.data as any[]) || []) as MonthlyGoalRow[],
+    buMeta: ((bm.data as any[]) || []) as { bu: BU3; leads_meta: number; taxa_conversao_meta: number }[],
+    buProductGoals: ((bpg.data as any[]) || []) as { bu: BU3; product_line: string; valor_meta: number; quantidade_meta: number }[],
+  };
+});
+
+// Canal Direto/IA do mes (vendas e visitas).
+const loadMonthDirect = memo(async (year: number, month: number) => {
+  const { firstDay, lastDay } = monthRange(year, month);
+  const [sales, visits] = await Promise.all([
+    fetchAll<DirectSaleRow>("direct_sales", () =>
+      supabaseAdmin
+        .from("direct_sales")
+        .select("*")
+        .gte("sale_date", firstDay)
+        .lt("sale_date", lastDay)
+        .order("sale_date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id")
+    ),
+    fetchAll<{ date: string; qty: number }>("direct_visits", () =>
+      supabaseAdmin
+        .from("direct_visits")
+        .select("date, qty")
+        .gte("date", firstDay)
+        .lt("date", lastDay)
+        .order("date")
+    ),
+  ]);
+  return { sales, visits: visits.map((r) => ({ date: r.date, qty: Number(r.qty || 0) })) };
+});
 
 export type Seller = {
   id: string;
@@ -60,10 +221,10 @@ const SELLER_COLS_WITH_PWD =
 const SELLER_COLS_FALLBACK =
   "id, name, bu, bus, active, avatar_color, avatar_url";
 
-export async function listSellers(opts?: { onlyActive?: boolean }): Promise<Seller[]> {
+const loadSellers = memo(async (onlyActive: boolean): Promise<Seller[]> => {
   const run = async (cols: string) => {
     let q = supabaseAdmin.from("sellers").select(cols).order("name");
-    if (opts?.onlyActive) q = q.eq("active", true);
+    if (onlyActive) q = q.eq("active", true);
     return q;
   };
   let { data, error } = await run(SELLER_COLS_WITH_PWD);
@@ -78,9 +239,13 @@ export async function listSellers(opts?: { onlyActive?: boolean }): Promise<Sell
     return [];
   }
   return ((data as any[]) || []).map(normalizeSeller);
+});
+
+export async function listSellers(opts?: { onlyActive?: boolean }): Promise<Seller[]> {
+  return loadSellers(Boolean(opts?.onlyActive));
 }
 
-export async function getSeller(id: string): Promise<Seller | null> {
+export const getSeller = memo(async (id: string): Promise<Seller | null> => {
   const run = (cols: string) =>
     supabaseAdmin.from("sellers").select(cols).eq("id", id).maybeSingle();
   let { data, error } = await run(SELLER_COLS_WITH_PWD);
@@ -93,7 +258,7 @@ export async function getSeller(id: string): Promise<Seller | null> {
     return null;
   }
   return data ? normalizeSeller(data as any) : null;
-}
+});
 
 export async function listSellersOfBu(bu: "cppem" | "unicive" | "colegio_cppem", opts?: { onlyActive?: boolean }): Promise<Seller[]> {
   const all = await listSellers(opts);
@@ -104,61 +269,63 @@ export async function listSellersOfBu(bu: "cppem" | "unicive" | "colegio_cppem",
 // Stats por vendedor — agora SEMPRE atrelado a uma BU.
 // Pra vendedor multi-BU, statsForAll devolve 1 entrada por (seller, bu).
 // =====================================================
+// Dados brutos de UM vendedor no mes (compartilhado entre stats e serie diaria,
+// que antes consultavam as mesmas vendas/leads duas vezes). Vendas de TODAS as
+// BUs do vendedor numa consulta so: o filtro por BU e a contagem total (usada
+// na conversao) saem da mesma lista.
+const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number) => {
+  const { firstDay, lastDay } = monthRange(year, month);
+  const [sales, leads, pg, mg] = await Promise.all([
+    fetchAll<SaleLite>("sales(seller)", () =>
+      supabaseAdmin
+        .from("sales")
+        .select("*")
+        .eq("seller_id", sellerId)
+        .gte("sale_date", firstDay)
+        .lt("sale_date", lastDay)
+        .order("id")
+    ),
+    fetchAll<{ date: string; qty: number }>("daily_leads(seller)", () =>
+      supabaseAdmin
+        .from("daily_leads")
+        .select("date, qty")
+        .eq("seller_id", sellerId)
+        .gte("date", firstDay)
+        .lt("date", lastDay)
+        .order("date")
+    ),
+    supabaseAdmin
+      .from("product_goals")
+      .select("product_line, valor_meta, quantidade_meta")
+      .eq("seller_id", sellerId)
+      .eq("year", year)
+      .eq("month", month),
+    supabaseAdmin
+      .from("monthly_goals")
+      .select("bu, ticket_medio_meta, taxa_conversao_meta, valor_meta, quantidade_meta, leads_meta")
+      .eq("seller_id", sellerId)
+      .eq("year", year)
+      .eq("month", month),
+  ]);
+  return {
+    sales,
+    leads,
+    productGoals: ((pg.data as any[]) || []) as Omit<ProductGoalRow, "seller_id">[],
+    monthlyGoals: ((mg.data as any[]) || []) as Omit<MonthlyGoalRow, "seller_id">[],
+  };
+});
+
 export async function statsForSellerInBu(
   seller: Seller,
   bu: "cppem" | "unicive" | "colegio_cppem",
   opts?: { year?: number; month?: number }
 ): Promise<SellerStats> {
   const { year, month } = { ...periodNow(), ...opts };
-  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
-
   const productIds = productIdsFor(bu) as unknown as string[];
+  const pidSet = new Set(productIds);
+  const raw = await sellerMonthRaw(seller.id, year, month);
 
-  const [{ data: pg }, { data: mg }, { data: sl }, { data: lds }, { data: slAll }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("product_goals")
-        .select("product_line, valor_meta, quantidade_meta")
-        .eq("seller_id", seller.id)
-        .eq("year", year)
-        .eq("month", month)
-        .in("product_line", productIds),
-      supabaseAdmin
-        .from("monthly_goals")
-        .select("ticket_medio_meta, taxa_conversao_meta, valor_meta, quantidade_meta, leads_meta")
-        .eq("seller_id", seller.id)
-        .eq("bu", bu)
-        .eq("year", year)
-        .eq("month", month)
-        .maybeSingle(),
-      supabaseAdmin
-        .from("sales")
-        .select("*")
-        .eq("seller_id", seller.id)
-        .in("product_line", productIds)
-        .gte("sale_date", firstDay)
-        .lt("sale_date", lastDay),
-      supabaseAdmin
-        .from("daily_leads")
-        .select("qty")
-        .eq("seller_id", seller.id)
-        .gte("date", firstDay)
-        .lt("date", lastDay),
-      // Total de vendas do vendedor em TODAS as BUs no mes (sem filtro de
-      // product_line) — usado pro calculo de conversao real, ja que leads
-      // nao distinguem por BU. Pega so o id pra contar via length.
-      supabaseAdmin
-        .from("sales")
-        .select("id")
-        .eq("seller_id", seller.id)
-        .gte("sale_date", firstDay)
-        .lt("sale_date", lastDay),
-    ]);
-
-  const leadsMonth = (lds || []).reduce((s: number, r: any) => s + Number(r.qty || 0), 0);
-  const vendasTotalNoMes = ((slAll as any[]) || []).length;
+  const leadsMonth = raw.leads.reduce((a, r) => a + Number(r.qty || 0), 0);
 
   return computeSellerStats({
     seller: {
@@ -168,10 +335,12 @@ export async function statsForSellerInBu(
       avatar_url: seller.avatar_url,
       avatar_color: seller.avatar_color,
     },
-    productGoals: (pg as any) || [],
-    monthly: (mg as any) || null,
-    sales: (sl as any) || [],
-    vendasCountTotal: vendasTotalNoMes,
+    productGoals: raw.productGoals.filter((g) => pidSet.has(g.product_line)),
+    monthly: raw.monthlyGoals.find((g) => g.bu === bu) || null,
+    sales: raw.sales.filter((r) => pidSet.has(r.product_line)),
+    // Total de vendas do vendedor em TODAS as BUs no mes (conversao real: leads
+    // nao distinguem por BU).
+    vendasCountTotal: raw.sales.length,
     leadsMonth,
     year,
     month,
@@ -190,14 +359,62 @@ export async function statsForSeller(
 }
 
 export async function statsForAll(opts?: { year?: number; month?: number }): Promise<SellerStats[]> {
-  const sellers = await listSellers({ onlyActive: true });
-  const tasks: Promise<SellerStats>[] = [];
-  for (const s of sellers) {
-    for (const bu of buListOf(s)) {
-      tasks.push(statsForSellerInBu(s, bu, opts));
+  const { year, month } = { ...periodNow(), ...opts };
+  // 5 leituras em lote (vendedores, vendas, leads, metas) no lugar de 5
+  // consultas por vendedor/BU.
+  const [sellers, sales, leads, goals] = await Promise.all([
+    listSellers({ onlyActive: true }),
+    loadMonthSales(year, month),
+    loadMonthLeads(year, month),
+    loadMonthGoals(year, month),
+  ]);
+
+  const salesBySeller = new Map<string, SaleLite[]>();
+  for (const r of sales) {
+    const arr = salesBySeller.get(r.seller_id);
+    if (arr) arr.push(r);
+    else salesBySeller.set(r.seller_id, [r]);
+  }
+  const leadsBySeller = new Map<string, number>();
+  for (const r of leads) {
+    leadsBySeller.set(r.seller_id, (leadsBySeller.get(r.seller_id) || 0) + Number(r.qty || 0));
+  }
+  const pgBySeller = new Map<string, ProductGoalRow[]>();
+  for (const g of goals.productGoals) {
+    const arr = pgBySeller.get(g.seller_id);
+    if (arr) arr.push(g);
+    else pgBySeller.set(g.seller_id, [g]);
+  }
+  const mgBySellerBu = new Map<string, MonthlyGoalRow>();
+  for (const g of goals.monthlyGoals) mgBySellerBu.set(`${g.seller_id}|${g.bu}`, g);
+
+  const out: SellerStats[] = [];
+  for (const seller of sellers) {
+    const mine = salesBySeller.get(seller.id) || [];
+    const leadsMonth = leadsBySeller.get(seller.id) || 0;
+    for (const bu of buListOf(seller)) {
+      const pidSet = new Set(productIdsFor(bu) as unknown as string[]);
+      out.push(
+        computeSellerStats({
+          seller: {
+            id: seller.id,
+            name: seller.name,
+            bu,
+            avatar_url: seller.avatar_url,
+            avatar_color: seller.avatar_color,
+          },
+          productGoals: (pgBySeller.get(seller.id) || []).filter((g) => pidSet.has(g.product_line)),
+          monthly: mgBySellerBu.get(`${seller.id}|${bu}`) || null,
+          sales: mine.filter((r) => pidSet.has(r.product_line)),
+          vendasCountTotal: mine.length,
+          leadsMonth,
+          year,
+          month,
+        })
+      );
     }
   }
-  return Promise.all(tasks);
+  return out;
 }
 
 // =====================================================
@@ -296,42 +513,20 @@ export async function buSeries(
     };
   }
 
-  const [{ data: sales }, { data: pgoals }, { data: mgoals }, { data: bm }, { data: leadsRows }] = await Promise.all([
-    supabaseAdmin
-      .from("sales")
-      .select("seller_id, sale_date, valor, quantidade, product_line")
-      .in("seller_id", ids)
-      .in("product_line", productIds)
-      .gte("sale_date", firstDay)
-      .lt("sale_date", lastDay),
-    supabaseAdmin
-      .from("product_goals")
-      .select("seller_id, valor_meta, quantidade_meta, product_line")
-      .in("seller_id", ids)
-      .in("product_line", productIds)
-      .eq("year", year)
-      .eq("month", month),
-    supabaseAdmin
-      .from("monthly_goals")
-      .select("seller_id, ticket_medio_meta, valor_meta, quantidade_meta")
-      .in("seller_id", ids)
-      .eq("bu", bu)
-      .eq("year", year)
-      .eq("month", month),
-    supabaseAdmin
-      .from("bu_meta")
-      .select("leads_meta, taxa_conversao_meta")
-      .eq("bu", bu)
-      .eq("year", year)
-      .eq("month", month)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("daily_leads")
-      .select("date, qty")
-      .in("seller_id", ids)
-      .gte("date", firstDay)
-      .lt("date", lastDay),
+  // Leituras do mes em lote (compartilhadas com as demais BUs na mesma requisicao).
+  const idSet = new Set(ids);
+  const pidSet = new Set(productIds);
+  const [allSales, allLeads, goals, direct] = await Promise.all([
+    loadMonthSales(year, month),
+    loadMonthLeads(year, month),
+    loadMonthGoals(year, month),
+    bu === "colegio_cppem" ? Promise.resolve(null) : loadMonthDirect(year, month),
   ]);
+  const sales = allSales.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
+  const pgoals = goals.productGoals.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
+  const mgoals = goals.monthlyGoals.filter((r) => idSet.has(r.seller_id) && r.bu === bu);
+  const bm = goals.buMeta.find((r) => r.bu === bu) || null;
+  const leadsRows = allLeads.filter((r) => idSet.has(r.seller_id));
   const leadsMeta = Number((bm as any)?.leads_meta || 0);
   const taxaConversaoMeta = Number((bm as any)?.taxa_conversao_meta || 0);
 
@@ -352,10 +547,7 @@ export async function buSeries(
   // vendedor. O canal 'direto' e so CPPEM; o canal 'ia' pode ser tanto
   // CPPEM quanto UNICIVE. Filtra por product_line pra pegar so as
   // vendas relevantes pra BU atual (Colegio nunca tem venda no direto/IA).
-  const buProductIds = new Set(productIds);
-  const directSales = bu === "colegio_cppem"
-    ? []
-    : (await fetchDirectSales(year, month)).filter((s) => buProductIds.has(s.product_line));
+  const directSales = direct ? direct.sales.filter((s) => pidSet.has(s.product_line)) : [];
 
   const buckets: Record<string, { valor: number; qtd: number; leads: number }> = {};
   for (let d = 1; d <= total; d++) {
@@ -543,27 +735,13 @@ export async function sellerSeries(
 ): Promise<{ daily: DailySeriesRow[]; cumulative: CumulativeRow[] }> {
   const { year, month } = { ...periodNow(), ...opts };
   const mm = String(month).padStart(2, "0");
-  const firstDay = `${year}-${mm}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
   const total = daysInMonth(year, month);
   const productIds = productIdsFor(bu) as unknown as string[];
 
-  const [{ data: sales }, { data: leadsRows }] = await Promise.all([
-    supabaseAdmin
-      .from("sales")
-      .select("sale_date, valor, quantidade")
-      .eq("seller_id", seller.id)
-      .in("product_line", productIds)
-      .gte("sale_date", firstDay)
-      .lt("sale_date", lastDay),
-    supabaseAdmin
-      .from("daily_leads")
-      .select("date, qty")
-      .eq("seller_id", seller.id)
-      .gte("date", firstDay)
-      .lt("date", lastDay),
-  ]);
+  const raw = await sellerMonthRaw(seller.id, year, month);
+  const pidSet = new Set(productIds);
+  const sales = raw.sales.filter((r) => pidSet.has(r.product_line));
+  const leadsRows = raw.leads;
 
   const buckets: Record<string, { valor: number; qtd: number; leads: number }> = {};
   for (let d = 1; d <= total; d++) {
@@ -611,14 +789,13 @@ export async function productBreakdown(
   opts?: { year?: number; month?: number }
 ): Promise<ProductBreakdownRow[]> {
   const { year, month } = { ...periodNow(), ...opts };
-  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
 
   const sellers = await listSellers({ onlyActive: true });
   const buSellers = sellers.filter((s) => buListOf(s).includes(bu));
   const ids = buSellers.map((s) => s.id);
+  const idSet = new Set(ids);
   const productIds = productIdsFor(bu) as unknown as string[];
+  const pidSet = new Set(productIds);
 
   const map: Record<string, ProductBreakdownRow> = {};
   productIds.forEach((id) => {
@@ -632,32 +809,18 @@ export async function productBreakdown(
     };
   });
 
-  const [{ data: sales }, { data: buGoals }, { data: legacyGoals }] = await Promise.all([
-    ids.length === 0
-      ? Promise.resolve({ data: [] })
-      : supabaseAdmin
-          .from("sales")
-          .select("product_line, valor, quantidade")
-          .in("seller_id", ids)
-          .in("product_line", productIds)
-          .gte("sale_date", firstDay)
-          .lt("sale_date", lastDay),
-    supabaseAdmin
-      .from("bu_product_goals")
-      .select("product_line, valor_meta, quantidade_meta")
-      .eq("bu", bu)
-      .eq("year", year)
-      .eq("month", month),
-    ids.length === 0
-      ? Promise.resolve({ data: [] })
-      : supabaseAdmin
-          .from("product_goals")
-          .select("product_line, valor_meta, quantidade_meta")
-          .in("seller_id", ids)
-          .in("product_line", productIds)
-          .eq("year", year)
-          .eq("month", month),
+  const withDirect = bu === "cppem" || bu === "unicive";
+  const [allSales, goals, direct] = await Promise.all([
+    ids.length === 0 ? Promise.resolve([] as SaleLite[]) : loadMonthSales(year, month),
+    loadMonthGoals(year, month),
+    withDirect ? loadMonthDirect(year, month) : Promise.resolve(null),
   ]);
+  const sales = allSales.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
+  const buGoals = goals.buProductGoals.filter((g) => g.bu === bu);
+  const legacyGoals =
+    ids.length === 0
+      ? []
+      : goals.productGoals.filter((g) => idSet.has(g.seller_id) && pidSet.has(g.product_line));
 
   for (const s of (sales as any[]) || []) {
     if (map[s.product_line]) {
@@ -669,9 +832,8 @@ export async function productBreakdown(
   // Vendas do canal DIRETO/IA tambem contam nas metas por categoria da
   // BU. Direto e so CPPEM; IA pode ser CPPEM ou UNICIVE. Filtra por
   // product_line (`map`) pra pegar so as relevantes da BU atual.
-  if (bu === "cppem" || bu === "unicive") {
-    const directSales = await fetchDirectSales(year, month);
-    for (const r of directSales) {
+  if (direct) {
+    for (const r of direct.sales) {
       if (map[r.product_line]) {
         map[r.product_line].valor += Number(r.valor || 0);
         map[r.product_line].qtd += Number(r.quantidade || 0);
@@ -679,16 +841,16 @@ export async function productBreakdown(
     }
   }
 
-  const hasBuGoals = (buGoals as any[])?.length > 0;
+  const hasBuGoals = buGoals.length > 0;
   if (hasBuGoals) {
-    for (const g of (buGoals as any[]) || []) {
+    for (const g of buGoals) {
       if (map[g.product_line]) {
         map[g.product_line].valor_meta = Number(g.valor_meta || 0);
         map[g.product_line].quantidade_meta = Number(g.quantidade_meta || 0);
       }
     }
   } else {
-    for (const g of (legacyGoals as any[]) || []) {
+    for (const g of legacyGoals) {
       if (map[g.product_line]) {
         map[g.product_line].valor_meta += Number(g.valor_meta || 0);
         map[g.product_line].quantidade_meta += Number(g.quantidade_meta || 0);
@@ -710,27 +872,16 @@ export async function indicacaoBreakdown(opts?: {
   month?: number;
 }): Promise<IndicacaoRow[]> {
   const { year, month } = { ...periodNow(), ...opts };
-  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
-
-  let q = supabaseAdmin
-    .from("sales")
-    .select("indicacao_status, valor, product_line")
-    .gte("sale_date", firstDay)
-    .lt("sale_date", lastDay);
-
+  let data = await loadMonthSales(year, month);
   if (opts?.bu) {
-    const productIds = productIdsFor(opts.bu) as unknown as string[];
-    q = q.in("product_line", productIds);
+    const pidSet = new Set(productIdsFor(opts.bu) as unknown as string[]);
+    data = data.filter((r) => pidSet.has(r.product_line));
   }
-
-  const { data } = await q;
   const acc: Record<string, IndicacaoRow> = {
     feita_por_indicacao: { status: "feita_por_indicacao", count: 0, valor: 0 },
     sem_indicacao: { status: "sem_indicacao", count: 0, valor: 0 },
   };
-  for (const r of (data as any[]) || []) {
+  for (const r of data) {
     const k = r.indicacao_status || "sem_indicacao";
     if (!acc[k]) acc[k] = { status: k, count: 0, valor: 0 };
     acc[k].count += 1;
@@ -745,34 +896,17 @@ export async function ligacaoBreakdown(opts?: {
   month?: number;
 }): Promise<LigacaoRow[]> {
   const { year, month } = { ...periodNow(), ...opts };
-  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
-
-  const seed = (): LigacaoRow[] => [
-    { status: "consegui_direto", count: 0, valor: 0 },
-    { status: "consegui_indireto", count: 0, valor: 0 },
-    { status: "sem_ligacao", count: 0, valor: 0 },
-  ];
-
-  let q = supabaseAdmin
-    .from("sales")
-    .select("ligacao_status, valor, product_line")
-    .gte("sale_date", firstDay)
-    .lt("sale_date", lastDay);
-
+  let data = await loadMonthSales(year, month);
   if (opts?.bu) {
-    const productIds = productIdsFor(opts.bu) as unknown as string[];
-    q = q.in("product_line", productIds);
+    const pidSet = new Set(productIdsFor(opts.bu) as unknown as string[]);
+    data = data.filter((r) => pidSet.has(r.product_line));
   }
-
-  const { data } = await q;
   const acc: Record<string, LigacaoRow> = {
     consegui_direto: { status: "consegui_direto", count: 0, valor: 0 },
     consegui_indireto: { status: "consegui_indireto", count: 0, valor: 0 },
     sem_ligacao: { status: "sem_ligacao", count: 0, valor: 0 },
   };
-  for (const r of (data as any[]) || []) {
+  for (const r of data) {
     const k = r.ligacao_status || "sem_ligacao";
     if (!acc[k]) acc[k] = { status: k, count: 0, valor: 0 };
     acc[k].count += 1;
@@ -797,30 +931,17 @@ export type DirectSaleRow = {
   channel?: "direto" | "ia" | null;
 };
 
+// Vendas/visitas do canal Direto/IA do mes (compartilhado, ver loadMonthDirect).
+export async function directMonthRaw(year: number, month: number) {
+  return loadMonthDirect(year, month);
+}
+
 async function fetchDirectSales(year: number, month: number): Promise<DirectSaleRow[]> {
-  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
-  const { data } = await supabaseAdmin
-    .from("direct_sales")
-    .select("*")
-    .gte("sale_date", firstDay)
-    .lt("sale_date", lastDay)
-    .order("sale_date", { ascending: false })
-    .order("created_at", { ascending: false });
-  return ((data as any[]) || []) as DirectSaleRow[];
+  return (await loadMonthDirect(year, month)).sales;
 }
 
 async function fetchDirectVisits(year: number, month: number): Promise<{ date: string; qty: number }[]> {
-  const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
-  const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
-  const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
-  const { data } = await supabaseAdmin
-    .from("direct_visits")
-    .select("date, qty")
-    .gte("date", firstDay)
-    .lt("date", lastDay);
-  return ((data as any[]) || []).map((r) => ({ date: r.date, qty: Number(r.qty || 0) }));
+  return (await loadMonthDirect(year, month)).visits;
 }
 
 export type DirectSnapshot = {

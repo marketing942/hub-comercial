@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2, Check, X, Globe, Bot, MousePointerClick, Wallet, TrendingUp } from "lucide-react";
 import NumberField from "@/components/NumberField";
@@ -27,21 +27,33 @@ function linesFor(channel: Channel, bu: BU): { id: string; label: string }[] {
 export default function DiretoClient({
   defaultYear,
   defaultMonth,
+  initialSales,
+  initialVisits,
 }: {
   defaultYear: number;
   defaultMonth: number;
+  initialSales: DiretoSale[];
+  initialVisits: { date: string; qty: number }[];
 }) {
   const router = useRouter();
   const [year, setYear] = useState(defaultYear);
   const [month, setMonth] = useState(defaultMonth);
 
-  const [list, setList] = useState<DiretoSale[]>([]);
-  const [visits, setVisits] = useState<Record<string, number>>({});
+  const [list, setList] = useState<DiretoSale[]>(initialSales);
+  const [visits, setVisits] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    for (const v of initialVisits) map[v.date] = Number(v.qty || 0);
+    return map;
+  });
 
   const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [visitsModalOpen, setVisitsModalOpen] = useState(false);
 
+  // O mes padrao ja veio do servidor; so busca ao trocar de periodo.
+  const loadedKey = useRef(`${defaultYear}-${defaultMonth}`);
   useEffect(() => {
+    if (loadedKey.current === `${year}-${month}`) return;
+    loadedKey.current = `${year}-${month}`;
     loadSales();
     loadVisits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
