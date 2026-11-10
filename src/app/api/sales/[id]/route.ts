@@ -34,7 +34,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (valid.includes(b.indicacao_status)) patch.indicacao_status = b.indicacao_status;
   }
 
-  let q = supabaseAdmin.from("sales").update(patch).eq("id", params.id);
+  // Editar a mao uma linha do Conta Azul nao adianta: a proxima rodada do sync
+  // regrava a janela inteira e a alteracao some sem explicacao. O filtro recusa
+  // em vez de aceitar e desfazer depois.
+  let q = supabaseAdmin.from("sales").update(patch).eq("id", params.id).eq("origem", "manual");
   if (s.role === "seller") q = q.eq("seller_id", s.sellerId!);
   const { error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -44,7 +47,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
-  let q = supabaseAdmin.from("sales").delete().eq("id", params.id);
+  let q = supabaseAdmin.from("sales").delete().eq("id", params.id).eq("origem", "manual");
   if (s.role === "seller") q = q.eq("seller_id", s.sellerId!);
   const { error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

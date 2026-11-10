@@ -145,6 +145,9 @@ export async function computeLongTermProgress(
       supabaseAdmin
         .from("sales")
         .select("quantidade")
+        // Meta longa conta matricula lancada a mao. Somar o Conta Azul aqui
+        // mudaria um numero que ja esta no ar. Ver src/lib/fonte.ts.
+        .eq("origem", "manual")
         .in("seller_id", sellerIds)
         .in("product_line", productIds)
         .gte("sale_date", firstDay)

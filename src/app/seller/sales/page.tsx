@@ -17,6 +17,11 @@ export default async function MySalesPage() {
   const { data } = await supabaseAdmin
     .from("sales")
     .select("*")
+    // So o que foi lancado A MAO. As linhas do Conta Azul (origem =
+    // 'conta_azul') existem desde a integracao, mas vivem exclusivamente no GAV
+    // (/admin/gav) — nenhuma tela que ja funcionava pode mudar de numero nem
+    // mostrar dado novo. Ver src/lib/fonte.ts.
+    .eq("origem", "manual")
     .eq("seller_id", seller.id)
     .gte("sale_date", firstDay)
     .lt("sale_date", lastDay)

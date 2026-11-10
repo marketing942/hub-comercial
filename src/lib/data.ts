@@ -14,6 +14,7 @@ import {
   type SellerStats,
 } from "./calc";
 import { productLabel, productIdsFor, buFromProductLine, isQtdPrimary } from "./products";
+import { FONTE_PADRAO, type Fonte } from "./fonte";
 
 // ---------------------------------------------------------------------------
 // Cache por requisicao + leitura em lote
@@ -70,29 +71,63 @@ type SaleLite = {
 };
 const SALE_COLS = "id, seller_id, sale_date, product_line, valor, quantidade, ligacao_status, indicacao_status";
 
-// Todas as vendas do mes (todos os vendedores/BUs).
-const loadMonthSales = memo(async (year: number, month: number): Promise<SaleLite[]> => {
-  const { firstDay, lastDay } = monthRange(year, month);
-  const run = (cols: string, strict: boolean) =>
-    fetchAll<SaleLite>(
-      "sales",
-      () =>
-        supabaseAdmin
-          .from("sales")
-          .select(cols)
-          .gte("sale_date", firstDay)
-          .lt("sale_date", lastDay)
-          .order("id"),
-      strict
-    );
-  try {
-    return await run(SALE_COLS, true);
-  } catch (e) {
-    // Banco sem alguma coluna nova (migracao pendente): le tudo e degrada.
-    console.warn("sales com colunas explicitas falhou — fallback select(*):", (e as Error).message);
-    return run("*", false);
+// Todas as vendas do mes (todos os vendedores/BUs), de UMA origem.
+//
+// `fonte` e um argumento POSICIONAL e primitivo de proposito. `memo` e
+// `React.cache`, que chaveia pelos argumentos comparando por identidade: se a
+// fonte viesse dentro de um objeto (`{ fonte }`), cada chamada criaria um objeto
+// novo, o cache nunca acertaria e voltariamos as ~120 consultas por abertura que
+// motivaram esses loaders. E se ela NAO entrasse na assinatura, o dashboard
+// normal e o GAV na mesma requisicao serviriam um o cache do outro — o GAV
+// mostraria numero manual com cara de Conta Azul, que e o pior resultado
+// possivel numa tela cuja funcao e conferir.
+const loadMonthSales = memo(
+  async (year: number, month: number, fonte: Fonte): Promise<SaleLite[]> => {
+    const { firstDay, lastDay } = monthRange(year, month);
+    const run = (cols: string, strict: boolean, comOrigem: boolean) =>
+      fetchAll<SaleLite>(
+        "sales",
+        () => {
+          const q = supabaseAdmin
+            .from("sales")
+            .select(cols)
+            .gte("sale_date", firstDay)
+            .lt("sale_date", lastDay);
+          return (comOrigem ? q.eq("origem", fonte) : q).order("id");
+        },
+        strict
+      );
+    try {
+      return await run(SALE_COLS, true, true);
+    } catch (e) {
+      const msg = (e as Error).message;
+      // Banco sem a coluna `origem` (migracao ca-01-origem.sql pendente).
+      // Para `manual` da para degradar: antes da migracao TODA venda e manual,
+      // entao ler sem o filtro devolve exatamente o mesmo conjunto e a tela que
+      // esta no ar continua correta.
+      //
+      // Para `conta_azul`, NAO. Degradar ali entregaria as vendas manuais
+      // rotuladas como Conta Azul — o GAV diria que esta tudo certo justamente
+      // quando nao ha nada para conferir. Melhor devolver vazio: a tela trata e
+      // manda rodar a migracao.
+      if (/origem/i.test(msg)) {
+        if (fonte !== "manual") {
+          console.error("sales: coluna `origem` ausente — GAV devolve vazio de proposito.", msg);
+          return [];
+        }
+        console.warn("sales: coluna `origem` ausente — lendo sem filtro (tudo e manual).", msg);
+        try {
+          return await run(SALE_COLS, true, false);
+        } catch {
+          return run("*", false, false);
+        }
+      }
+      // Banco sem alguma outra coluna nova: le tudo e degrada.
+      console.warn("sales com colunas explicitas falhou — fallback select(*):", msg);
+      return run("*", false, true);
+    }
   }
-});
+);
 
 const loadMonthLeads = memo(async (year: number, month: number) => {
   const { firstDay, lastDay } = monthRange(year, month);
@@ -150,13 +185,16 @@ const loadMonthGoals = memo(async (year: number, month: number) => {
 });
 
 // Canal Direto/IA do mes (vendas e visitas).
-const loadMonthDirect = memo(async (year: number, month: number) => {
+const loadMonthDirect = memo(async (year: number, month: number, fonte: Fonte) => {
   const { firstDay, lastDay } = monthRange(year, month);
   const [sales, visits] = await Promise.all([
+    // `select("*")` ja tolera coluna nova; o filtro por origem e que exige a
+    // migracao. Mesma regra do loadMonthSales: so `manual` degrada sem ela.
     fetchAll<DirectSaleRow>("direct_sales", () =>
       supabaseAdmin
         .from("direct_sales")
         .select("*")
+        .eq("origem", fonte)
         .gte("sale_date", firstDay)
         .lt("sale_date", lastDay)
         .order("sale_date", { ascending: false })
@@ -273,7 +311,7 @@ export async function listSellersOfBu(bu: "cppem" | "unicive" | "colegio_cppem",
 // que antes consultavam as mesmas vendas/leads duas vezes). Vendas de TODAS as
 // BUs do vendedor numa consulta so: o filtro por BU e a contagem total (usada
 // na conversao) saem da mesma lista.
-const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number) => {
+const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number, fonte: Fonte) => {
   const { firstDay, lastDay } = monthRange(year, month);
   const [sales, leads, pg, mg] = await Promise.all([
     fetchAll<SaleLite>("sales(seller)", () =>
@@ -281,6 +319,7 @@ const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number
         .from("sales")
         .select("*")
         .eq("seller_id", sellerId)
+        .eq("origem", fonte)
         .gte("sale_date", firstDay)
         .lt("sale_date", lastDay)
         .order("id")
@@ -318,12 +357,13 @@ const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number
 export async function statsForSellerInBu(
   seller: Seller,
   bu: "cppem" | "unicive" | "colegio_cppem",
-  opts?: { year?: number; month?: number }
+  opts?: { year?: number; month?: number; fonte?: Fonte }
 ): Promise<SellerStats> {
   const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
   const productIds = productIdsFor(bu) as unknown as string[];
   const pidSet = new Set(productIds);
-  const raw = await sellerMonthRaw(seller.id, year, month);
+  const raw = await sellerMonthRaw(seller.id, year, month, fonte);
 
   const leadsMonth = raw.leads.reduce((a, r) => a + Number(r.qty || 0), 0);
 
@@ -350,7 +390,7 @@ export async function statsForSellerInBu(
 // Compat: 1 stats por vendedor — agora retorna array (1+) pra suportar multi-BU.
 export async function statsForSeller(
   sellerId: string,
-  opts?: { year?: number; month?: number }
+  opts?: { year?: number; month?: number; fonte?: Fonte }
 ): Promise<SellerStats[]> {
   const seller = await getSeller(sellerId);
   if (!seller) return [];
@@ -358,13 +398,14 @@ export async function statsForSeller(
   return Promise.all(tasks);
 }
 
-export async function statsForAll(opts?: { year?: number; month?: number }): Promise<SellerStats[]> {
+export async function statsForAll(opts?: { year?: number; month?: number; fonte?: Fonte }): Promise<SellerStats[]> {
   const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
   // 5 leituras em lote (vendedores, vendas, leads, metas) no lugar de 5
   // consultas por vendedor/BU.
   const [sellers, sales, leads, goals] = await Promise.all([
     listSellers({ onlyActive: true }),
-    loadMonthSales(year, month),
+    loadMonthSales(year, month, fonte),
     loadMonthLeads(year, month),
     loadMonthGoals(year, month),
   ]);
@@ -474,9 +515,10 @@ export type BUSeries = {
 
 export async function buSeries(
   bu: "cppem" | "unicive" | "colegio_cppem",
-  opts?: { year?: number; month?: number }
+  opts?: { year?: number; month?: number; fonte?: Fonte }
 ): Promise<BUSeries> {
   const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
   const firstDay = `${year}-${String(month).padStart(2, "0")}-01`;
   const next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
   const lastDay = `${next.y}-${String(next.m).padStart(2, "0")}-01`;
@@ -517,10 +559,10 @@ export async function buSeries(
   const idSet = new Set(ids);
   const pidSet = new Set(productIds);
   const [allSales, allLeads, goals, direct] = await Promise.all([
-    loadMonthSales(year, month),
+    loadMonthSales(year, month, fonte),
     loadMonthLeads(year, month),
     loadMonthGoals(year, month),
-    bu === "colegio_cppem" ? Promise.resolve(null) : loadMonthDirect(year, month),
+    bu === "colegio_cppem" ? Promise.resolve(null) : loadMonthDirect(year, month, fonte),
   ]);
   const sales = allSales.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
   const pgoals = goals.productGoals.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
@@ -731,14 +773,15 @@ export async function sellerSeries(
   seller: Seller,
   bu: "cppem" | "unicive" | "colegio_cppem",
   meta: number,
-  opts?: { year?: number; month?: number }
+  opts?: { year?: number; month?: number; fonte?: Fonte }
 ): Promise<{ daily: DailySeriesRow[]; cumulative: CumulativeRow[] }> {
   const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
   const mm = String(month).padStart(2, "0");
   const total = daysInMonth(year, month);
   const productIds = productIdsFor(bu) as unknown as string[];
 
-  const raw = await sellerMonthRaw(seller.id, year, month);
+  const raw = await sellerMonthRaw(seller.id, year, month, fonte);
   const pidSet = new Set(productIds);
   const sales = raw.sales.filter((r) => pidSet.has(r.product_line));
   const leadsRows = raw.leads;
@@ -786,9 +829,10 @@ export type ProductBreakdownRow = {
 
 export async function productBreakdown(
   bu: "cppem" | "unicive" | "colegio_cppem",
-  opts?: { year?: number; month?: number }
+  opts?: { year?: number; month?: number; fonte?: Fonte }
 ): Promise<ProductBreakdownRow[]> {
   const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
 
   const sellers = await listSellers({ onlyActive: true });
   const buSellers = sellers.filter((s) => buListOf(s).includes(bu));
@@ -811,9 +855,9 @@ export async function productBreakdown(
 
   const withDirect = bu === "cppem" || bu === "unicive";
   const [allSales, goals, direct] = await Promise.all([
-    ids.length === 0 ? Promise.resolve([] as SaleLite[]) : loadMonthSales(year, month),
+    ids.length === 0 ? Promise.resolve([] as SaleLite[]) : loadMonthSales(year, month, fonte),
     loadMonthGoals(year, month),
-    withDirect ? loadMonthDirect(year, month) : Promise.resolve(null),
+    withDirect ? loadMonthDirect(year, month, fonte) : Promise.resolve(null),
   ]);
   const sales = allSales.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
   const buGoals = goals.buProductGoals.filter((g) => g.bu === bu);
@@ -870,9 +914,11 @@ export async function indicacaoBreakdown(opts?: {
   bu?: "cppem" | "unicive" | "colegio_cppem";
   year?: number;
   month?: number;
+  fonte?: Fonte;
 }): Promise<IndicacaoRow[]> {
   const { year, month } = { ...periodNow(), ...opts };
-  let data = await loadMonthSales(year, month);
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
+  let data = await loadMonthSales(year, month, fonte);
   if (opts?.bu) {
     const pidSet = new Set(productIdsFor(opts.bu) as unknown as string[]);
     data = data.filter((r) => pidSet.has(r.product_line));
@@ -894,9 +940,11 @@ export async function ligacaoBreakdown(opts?: {
   bu?: "cppem" | "unicive" | "colegio_cppem";
   year?: number;
   month?: number;
+  fonte?: Fonte;
 }): Promise<LigacaoRow[]> {
   const { year, month } = { ...periodNow(), ...opts };
-  let data = await loadMonthSales(year, month);
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
+  let data = await loadMonthSales(year, month, fonte);
   if (opts?.bu) {
     const pidSet = new Set(productIdsFor(opts.bu) as unknown as string[]);
     data = data.filter((r) => pidSet.has(r.product_line));
@@ -932,16 +980,22 @@ export type DirectSaleRow = {
 };
 
 // Vendas/visitas do canal Direto/IA do mes (compartilhado, ver loadMonthDirect).
-export async function directMonthRaw(year: number, month: number) {
-  return loadMonthDirect(year, month);
+// `fonte` com default: os chamadores antigos (aba Direto/IA) seguem lendo o
+// manual sem alteracao.
+export async function directMonthRaw(year: number, month: number, fonte: Fonte = FONTE_PADRAO) {
+  return loadMonthDirect(year, month, fonte);
 }
 
-async function fetchDirectSales(year: number, month: number): Promise<DirectSaleRow[]> {
-  return (await loadMonthDirect(year, month)).sales;
+async function fetchDirectSales(year: number, month: number, fonte: Fonte): Promise<DirectSaleRow[]> {
+  return (await loadMonthDirect(year, month, fonte)).sales;
 }
 
-async function fetchDirectVisits(year: number, month: number): Promise<{ date: string; qty: number }[]> {
-  return (await loadMonthDirect(year, month)).visits;
+async function fetchDirectVisits(
+  year: number,
+  month: number,
+  fonte: Fonte
+): Promise<{ date: string; qty: number }[]> {
+  return (await loadMonthDirect(year, month, fonte)).visits;
 }
 
 export type DirectSnapshot = {
@@ -990,13 +1044,15 @@ export type DirectChannelAgg = {
 export async function directSnapshot(opts?: {
   year?: number;
   month?: number;
+  fonte?: Fonte;
 }): Promise<DirectSnapshot> {
   const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
   const total = daysInMonth(year, month);
 
   const [sales, visits] = await Promise.all([
-    fetchDirectSales(year, month),
-    fetchDirectVisits(year, month),
+    fetchDirectSales(year, month, fonte),
+    fetchDirectVisits(year, month, fonte),
   ]);
 
   const buckets: Record<string, { valor: number; qtd: number; visits: number }> = {};
@@ -1144,7 +1200,7 @@ export type DashboardSnapshot = {
 
 export async function dashboardSnapshot(
   bu: "cppem" | "unicive" | "colegio_cppem",
-  opts?: { year?: number; month?: number },
+  opts?: { year?: number; month?: number; fonte?: Fonte },
   // Stats de todos os vendedores ja carregados por quem chama — evita refazer
   // as mesmas consultas uma vez por BU.
   allStats?: SellerStats[]
@@ -1156,6 +1212,8 @@ export async function dashboardSnapshot(
     productBreakdown(bu, opts),
     ligacaoBreakdown({ bu, ...opts }),
     indicacaoBreakdown({ bu, ...opts }),
+    // A meta longa NAO tem origem: ela conta matriculas da base, nao vendas do
+    // mes. Fica igual nas duas visoes, de proposito.
     loadLongTermGoal(bu),
   ]);
   const longTerm = ltGoal ? await computeLongTermProgress(ltGoal) : null;

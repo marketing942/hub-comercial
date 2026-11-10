@@ -67,6 +67,9 @@ export async function GET(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("sales")
     .select("*")
+    // So o lancamento manual: as linhas do Conta Azul vivem exclusivamente no
+    // GAV (/admin/gav). Ver src/lib/fonte.ts.
+    .eq("origem", "manual")
     .eq("seller_id", sellerId)
     .gte("sale_date", firstDay)
     .lt("sale_date", lastDay)

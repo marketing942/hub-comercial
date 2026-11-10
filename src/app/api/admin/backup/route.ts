@@ -47,12 +47,17 @@ export async function GET(req: Request) {
     supabaseAdmin
       .from("sales")
       .select("id, seller_id, sale_date, product_line, valor, quantidade, cliente_nome, observacao, ligacao_status, indicacao_status, created_at, updated_at")
+      // O backup continua sendo o do lancamento manual, com o mesmo formato de
+      // sempre: quem consome o arquivo nao pode receber linhas novas sem aviso.
+      // O dado do Conta Azul e reproduzivel a partir do proprio Conta Azul.
+      .eq("origem", "manual")
       .gte("sale_date", firstDay)
       .lt("sale_date", lastDay)
       .order("sale_date", { ascending: true }),
     supabaseAdmin
       .from("direct_sales")
       .select("id, sale_date, product_line, valor, quantidade, observacao, channel, created_at")
+      .eq("origem", "manual")
       .gte("sale_date", firstDay)
       .lt("sale_date", lastDay)
       .order("sale_date", { ascending: true }),

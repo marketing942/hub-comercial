@@ -40,6 +40,11 @@ export default async function VendasPage({
   let q = supabaseAdmin
     .from("sales")
     .select("id, seller_id, sale_date, product_line, valor, quantidade, cliente_nome, observacao, ligacao_status, indicacao_status, created_at")
+    // So o que foi lancado A MAO. As linhas do Conta Azul (origem =
+    // 'conta_azul') existem desde a integracao, mas vivem exclusivamente no GAV
+    // (/admin/gav) — nenhuma tela que ja funcionava pode mudar de numero nem
+    // mostrar dado novo. Ver src/lib/fonte.ts.
+    .eq("origem", "manual")
     .gte("sale_date", firstDay)
     .lt("sale_date", lastDay)
     .order("sale_date", { ascending: false })

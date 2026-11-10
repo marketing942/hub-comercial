@@ -22,6 +22,12 @@ export async function GET(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("sales")
     .select("id, seller_id, valor, created_at")
+    // So o que foi lancado A MAO. As linhas do Conta Azul (origem =
+    // 'conta_azul') existem desde a integracao, mas vivem exclusivamente no GAV
+    // (/admin/gav) — nenhuma tela que ja funcionava pode mudar de numero nem
+    // mostrar dado novo. Ver src/lib/fonte.ts.
+    // Sem isto, a buzina de venda nova tocaria a cada rodada do sync.
+    .eq("origem", "manual")
     .gt("created_at", sinceDate.toISOString())
     .order("created_at", { ascending: true })
     .limit(50);

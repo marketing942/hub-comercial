@@ -48,7 +48,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (b.valor !== undefined) patch.valor = Number(b.valor);
   if (b.quantidade !== undefined) patch.quantidade = Number(b.quantidade);
   if (b.observacao !== undefined) patch.observacao = b.observacao;
-  const { error } = await supabaseAdmin.from("direct_sales").update(patch).eq("id", params.id);
+  const { error } = await supabaseAdmin.from("direct_sales").update(patch).eq("id", params.id).eq("origem", "manual");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
@@ -56,7 +56,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
   const s = await getSession();
   if (s?.role !== "admin") return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
-  const { error } = await supabaseAdmin.from("direct_sales").delete().eq("id", params.id);
+  const { error } = await supabaseAdmin.from("direct_sales").delete().eq("id", params.id).eq("origem", "manual");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

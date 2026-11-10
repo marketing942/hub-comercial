@@ -10,6 +10,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const items: SidebarItem[] = [
     { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
+    // GAV: o dashboard lendo o Conta Azul, para conferir antes do cutover.
+    // So admin — ate a conferencia fechar estes numeros ainda podem estar
+    // errados, e vendedor vendo a propria meta com numero que nao vale passa a
+    // discutir o numero em vez de vender. Ver src/lib/fonte.ts.
+    { href: "/admin/gav", label: "GAV", icon: "chart" },
     {
       href: "/admin/sellers",
       label: "Configuracoes",
