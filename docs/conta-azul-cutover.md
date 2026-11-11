@@ -1184,15 +1184,91 @@ Continua aberto:
    2026) conta para o vendedor; `1.6 REPASSE MENSALIDADE UNICIVE` não — e nem chega como venda.
 2. ✅ **Regra de `conta_vendedor` fechada** em 10/11: fora ficam 1.6, 1.8, **1.9 fardamentos**,
    **2.0 livros** e **2.1 eventos do Colégio** (além de fretes e multas). Tabela completa em §6.3.
-3. **As 300 vendas sem categoria** (R$ 46.167, 94 só em nov/26) são erro de lançamento — e §3.5
-   mostra que 10 dos 11 itens envolvidos se resolvem sozinhos pelo histórico. Fica a pergunta
-   operacional: alguém vai corrigir no Conta Azul, ou o Hub convive com o mapa de item? As duas
-   funcionam; a primeira limpa a origem.
+3. ✅ **As 300 vendas sem categoria** (R$ 46.167, 94 só em nov/26) foram resolvidas pelo mapa de
+   item em 11/11: o histórico classificou as famílias do CPPEM e da Unicive, e o nome do item
+   resolveu o Colégio (§12.1). Sobrou **1 item**, um ingresso de R$ 8,83. Fica a pergunta
+   operacional: alguém vai corrigir no Conta Azul também? Não é mais necessário para o Hub, mas
+   limparia a origem — e o relatório do próprio Conta Azul.
 4. **Lista completa de situações de venda** que contam como faturamento. O espelho trouxe
    `Faturado`, `Aprovado` e **um** `Cancelado` — o caminho de remoção de §6.4 não é hipotético.
 5. ✅ **De-para dos vendedores fechado** em 10/11 (§6.3): 6 vendedores, 2 canal direto, 18 grupo.
 6. **`metas_data`** — formato do jsonb e se ainda é alimentada.
 7. **A mensalidade tem meta?** Se tiver, onde ela é cadastrada (§8.3).
+
+---
+
+## 12.1 O que o GAV mediu em 11/11/2026 — e o que ainda é decisão de alguém
+
+A primeira conferência real rodou na janela **01/09 a 11/11/2026** (1.546 vendas no espelho). Três
+coisas estavam erradas no código e foram corrigidas; duas continuam esperando decisão humana.
+
+### Corrigido: o corte silencioso de 1.000 linhas
+
+`.limit(20000)` **não** levanta o teto do PostgREST — ele devolve 1.000 e não avisa. A normalização
+lia 1.000 de 1.546 vendas e **perdia 35% do faturamento**, produzindo um número plausível. Toda
+leitura do módulo passa agora por `src/lib/ca/ler.ts`, que pagina com `order` explícito (sem
+ordenação, a página 2 não continua de onde a 1 parou — o Postgres não promete ordem estável entre
+consultas).
+
+É a armadilha mais caras deste projeto porque o sintoma é um número *quase* certo.
+
+### Corrigido: o Colégio não tinha como ser classificado
+
+| O problema | Por quê | A correção |
+|---|---|---|
+| A série não sai da categoria | São 12 séries e 2 categorias (`1.7`, `1.8`) — nenhuma votação por categoria dominante descobre se é 6º ou 9º ano | `palpitarItem()` lê a série do **nome do item** (`MATRÍCULA - 9º Ano Ensino Fundamental`), que aqui é taxonomia de verdade |
+| Os itens do Colégio nunca entravam na fila | `itensRelevantes()` só olhava venda **sem categoria**; venda com categoria classificada **sem linha** — o caso do Colégio — ficava de fora | a relevância passou a ser "a categoria não resolve a linha", o que cobre os dois casos |
+| A mensalidade não tinha onde cair | O Colégio é medido em **quantidade** de matrículas: 54 mensalidades do 6º ano em `matricula_fund_6` viram 54 alunos novos. E criar a linha em `products.ts` a faria aparecer no formulário do vendedor | linhas só-do-grupo em `src/lib/ca/linhas.ts`: válidas para `ca_receita`, invisíveis para `sales` e para o vendedor |
+
+**Achado que confirma a precedência item→categoria de §4:** `1.7 - MATRÍCULA COLÉGIO` contém 7 itens
+`MENSALIDADE` (R$ 4.154) e `1.8 - MENSALIDADE COLÉGIO` contém 2 itens `MATRÍCULA` (R$ 874). Quem
+lança erra a categoria de vez em quando; o nome do item acerta as 9.
+
+### Corrigido: `ca_receita` era escrita e nunca lida
+
+Desde o início a receita do grupo ia para `ca_receita` e **nenhuma tela a mostrava**. O GAV exibia
+R$ 80 mil de novembro e escondia R$ 60 mil de mensalidade do Colégio. O painel
+`GavReceitaGrupo` agora separa dois blocos que nunca devem ser somados:
+
+- **receita do grupo** (desenho): mensalidade R$ 61.560 em out/26 · eventos R$ 960 · fardamento
+  R$ 466 · reforço R$ 295;
+- **sem dono** (defeito): a linha conta para vendedor e chegou sem vendedor que o Hub reconheça.
+
+### Resultado
+
+| | antes | depois |
+|---|---|---|
+| vendas consideradas | 999 | 1.544 |
+| viraram venda de vendedor | 714 | 1.104 |
+| linhas de receita do grupo | 209 | 451 |
+| **pendente** | **R$ 134.511** | **R$ 147** (1 item: ingresso de R$ 8,83) |
+
+Novembro, que é o mês em que o pipeline rodou do começo: manual R$ 78.733 × Conta Azul R$ 80.856
+(**+2,7%**), com as matrículas do Colégio fechando **ao centavo** (`matricula_fund_3`, `_7`, `_8`,
+`_9` com delta R$ 0,00) e `turmas_presenciais` com −R$ 23.
+
+### Aberto 8 — a DIRETORIA lança R$ 13.808 que contam para vendedor
+
+`DIRETORIA` está mapeada como `grupo` (correto: não é vendedora), mas 177 linhas lançadas por ela
+**contam** para vendedor — em maioria matrícula do Colégio. Hoje elas aparecem em "sem dono", o que
+é honesto e inútil: ninguém recebe.
+
+As opções não são equivalentes:
+
+1. **Creditar por regra de linha** — matrícula do Colégio lançada pela DIRETORIA vai para a Giovana
+   (que é a do Colégio). Resolve o valor; cria uma regra que precisa ser revista quando a pessoa do
+   Colégio mudar.
+2. **Corrigir na origem** — quem lança passa a pôr o vendedor certo no Conta Azul. Mais lento, e é a
+   única que também arruma o relatório do próprio Conta Azul.
+3. **Aceitar como receita do grupo** — a matrícula do Colégio não conta para ninguém. Muda a regra
+   fechada em 10/11 ("para o vendedor, só a matrícula conta").
+
+Isto move comissão, então é decisão do requisitante, não do código.
+
+### Aberto 9 — "Elias"
+
+Vendedor do Conta Azul que não está na lista dos 6 do Hub e tem R$ 566 de linhas que contam para
+vendedor. Precisa de um destino: vendedor novo, canal direto ou grupo.
 
 ---
 
