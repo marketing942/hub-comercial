@@ -17,6 +17,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 export interface ResultadoEspelho {
   vendas: number;
   itens: number;
+  /** Categorias cujo NOME o Jarvis mandou — é o que torna a tela classificável. */
+  categorias: number;
   /** Itens órfãos removidos: a venda deles não veio mais (cancelada, por exemplo). */
   orfaosRemovidos: number;
 }
@@ -33,6 +35,7 @@ export async function gravarEspelho(
   ate: string,
   vendasRaw: unknown[],
   itensRaw: unknown[],
+  categoriasRaw: unknown[] = [],
 ): Promise<ResultadoEspelho> {
   const agora = new Date().toISOString();
 
@@ -117,5 +120,29 @@ export async function gravarEspelho(
     if (error) throw new Error(`gravar ca_venda_itens: ${error.message}`);
   }
 
-  return { vendas: vendas.length, itens: itens.length, orfaosRemovidos };
+  /**
+   * Nomes das categorias → `ca_mapa_receita.ca_nome`.
+   *
+   * O upsert leva SÓ a chave e o nome. O PostgREST faz `DO UPDATE SET` apenas
+   * nas colunas enviadas, então classificação já feita (bu, product_line,
+   * conta_vendedor, ignorar) não é tocada — atualizar o nome nunca pode
+   * desclassificar nada.
+   */
+  const categorias = (categoriasRaw as Record<string, unknown>[])
+    .filter((c) => txt(c?.ca_id))
+    .map((c) => ({
+      ca_tipo: "categoria" as const,
+      ca_id: txt(c.ca_id)!,
+      ca_nome: [txt(c.codigo), txt(c.nome)].filter(Boolean).join(" - ") || null,
+    }))
+    .filter((c) => c.ca_nome);
+
+  for (let i = 0; i < categorias.length; i += 500) {
+    const { error } = await supabaseAdmin
+      .from("ca_mapa_receita")
+      .upsert(categorias.slice(i, i + 500), { onConflict: "ca_tipo,ca_id" });
+    if (error) throw new Error(`nomes de categoria: ${error.message}`);
+  }
+
+  return { vendas: vendas.length, itens: itens.length, categorias: categorias.length, orfaosRemovidos };
 }

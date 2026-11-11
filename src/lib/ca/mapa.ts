@@ -21,6 +21,16 @@ import { supabaseAdmin } from "@/lib/supabase";
 export const SUGESTAO_MIN_OCORRENCIAS = 5;
 export const SUGESTAO_MIN_DOMINANCIA = 0.9;
 
+/**
+ * O item PRECISA de classificação?
+ *
+ * Só quando ele aparece em venda SEM categoria — aí ele é a única fonte da
+ * linha de receita. Com categoria, ela resolve, e classificar o item seria
+ * trabalho que não produz nada.
+ *
+ * Medido em 11/11/2026: de 126 itens distintos na janela, **7** importam. Pedir
+ * os 126 foi o primeiro desenho desta tela, e era impossível de cumprir.
+ */
 export interface LinhaMapa {
   ca_tipo: "categoria" | "item";
   ca_id: string;
@@ -35,6 +45,11 @@ export interface LinhaMapa {
   vendas: number;
   /** Categoria dominante no histórico deste ITEM (só para pendentes). */
   sugestao: { categoriaCaId: string; nome: string; ocorrencias: number; dominancia: number } | null;
+  /**
+   * Para ITEM: aparece em venda sem categoria, então classificá-lo muda algo.
+   * Para CATEGORIA: sempre true — categoria é a chave principal.
+   */
+  relevante: boolean;
 }
 
 /** Nome legível das categorias, lido das próprias vendas + o mapa já classificado. */
@@ -137,12 +152,43 @@ async function volumes(): Promise<{ cat: Map<string, { valor: number; vendas: nu
   return { cat, item };
 }
 
+/** Itens que aparecem em venda SEM categoria — os únicos que mudam alguma coisa. */
+async function itensRelevantes(): Promise<Set<string>> {
+  const semCategoria = new Set<string>();
+  for (let f = 0; ; f += 1000) {
+    const { data } = await supabaseAdmin
+      .from("ca_vendas")
+      .select("ca_id, categoria_ca_id")
+      .is("categoria_ca_id", null)
+      .order("ca_id")
+      .range(f, f + 999);
+    for (const v of data ?? []) semCategoria.add(v.ca_id as string);
+    if ((data ?? []).length < 1000) break;
+  }
+  const out = new Set<string>();
+  if (semCategoria.size === 0) return out;
+  for (let f = 0; ; f += 1000) {
+    const { data } = await supabaseAdmin
+      .from("ca_venda_itens")
+      .select("item_ca_id, venda_ca_id")
+      .order("ca_id")
+      .range(f, f + 999);
+    for (const i of data ?? []) {
+      const id = i.item_ca_id as string | null;
+      if (id && semCategoria.has(i.venda_ca_id as string)) out.add(id);
+    }
+    if ((data ?? []).length < 1000) break;
+  }
+  return out;
+}
+
 export async function listarMapa(): Promise<{ categorias: LinhaMapa[]; itens: LinhaMapa[] }> {
-  const [{ data: linhas }, nomes, sug, vol] = await Promise.all([
+  const [{ data: linhas }, nomes, sug, vol, relevantes] = await Promise.all([
     supabaseAdmin.from("ca_mapa_receita").select("*").limit(5000),
     nomesDeCategoria(),
     sugestoesPorItem(),
     volumes(),
+    itensRelevantes(),
   ]);
 
   const montar = (tipo: "categoria" | "item"): LinhaMapa[] =>
@@ -173,10 +219,13 @@ export async function listarMapa(): Promise<{ categorias: LinhaMapa[]; itens: Li
                   dominancia: s.dominancia,
                 }
               : null,
+          relevante: tipo === "categoria" || relevantes.has(id),
         };
       })
       // Pendente primeiro, e dentro disso o que move mais dinheiro.
       .sort((a, b) => {
+        // Relevante primeiro; dentro disso, não-classificado; depois o que move mais.
+        if (a.relevante !== b.relevante) return a.relevante ? -1 : 1;
         const pa = a.product_line || a.ignorar ? 1 : 0;
         const pb = b.product_line || b.ignorar ? 1 : 0;
         if (pa !== pb) return pa - pb;

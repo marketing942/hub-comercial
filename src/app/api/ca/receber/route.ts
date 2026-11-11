@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
   }
 
-  let corpo: { de?: string; ate?: string; vendas?: unknown[]; itens?: unknown[] };
+  let corpo: { de?: string; ate?: string; vendas?: unknown[]; itens?: unknown[]; categorias?: unknown[] };
   try {
     corpo = await req.json();
   } catch {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const t0 = Date.now();
   try {
-    const espelho = await gravarEspelho(de, ate, corpo.vendas ?? [], corpo.itens ?? []);
+    const espelho = await gravarEspelho(de, ate, corpo.vendas ?? [], corpo.itens ?? [], corpo.categorias ?? []);
     const pend = await descobrirPendencias();
     const norm = await normalizarJanela(de, ate);
 

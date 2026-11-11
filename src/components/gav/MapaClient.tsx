@@ -40,6 +40,28 @@ const LINHAS_POR_BU: Record<string, readonly { id: string; label: string }[]> = 
 
 const BU_NOME: Record<string, string> = { cppem: "CPPEM", unicive: "UNICIVE", colegio_cppem: "Colégio" };
 
+/**
+ * Palpite de BU e de "conta para vendedor" a partir do NOME da categoria.
+ *
+ * As categorias do Conta Azul são uma lista curta e controlada pela
+ * contabilidade ("1.5 - MATRÍCULA UNICIVE", "1.8 - MENSALIDADE COLÉGIO"), não
+ * nomes livres de produto. Por isso aqui ler o texto é seguro — e isto é um
+ * PRÉ-PREENCHIMENTO de formulário, confirmado por gente, não uma regra que roda
+ * sozinha em produção. A distinção é a mesma de sempre: sugerir sim, decidir não.
+ */
+function palpite(nome: string | null): { bu: string; conta: boolean } | null {
+  if (!nome) return null;
+  const n = nome
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  const bu = n.includes("UNICIVE") ? "unicive" : n.includes("COLEGIO") ? "colegio_cppem" : n.includes("CPPEM") ? "cppem" : "";
+  if (!bu) return null;
+  // Recorrente e acessório não são esforço de venda; matrícula e curso são.
+  const foraDoVendedor = /MENSALIDADE|REPASSE|FARDAMENTO|LIVRO|FRETE|MULTA|RENDIMENTO|EMPRESTIMO/.test(n);
+  return { bu, conta: !foraDoVendedor };
+}
+
 export default function MapaClient({
   categorias,
   itens,
@@ -53,12 +75,18 @@ export default function MapaClient({
 }) {
   const [aba, setAba] = useState<"categorias" | "itens" | "vendedores">("categorias");
   const pendentesCat = categorias.filter((c) => !c.product_line && !c.ignorar).length;
-  const pendentesItem = itens.filter((c) => !c.product_line && !c.ignorar).length;
+  /**
+   * Só conta como pendente o item que MUDA alguma coisa — os que aparecem em
+   * venda sem categoria. A primeira versão desta tela anunciava "109 pendentes"
+   * sobre 126 itens, quando 7 importavam. Número que não se pode zerar deixa de
+   * ser tarefa e vira ruído.
+   */
+  const pendentesItem = itens.filter((c) => c.relevante && !c.product_line && !c.ignorar).length;
   const pendentesVend = vendedores.filter((v) => v.destino === "pendente").length;
 
   const abas = [
     { id: "categorias" as const, label: "Categorias", n: pendentesCat, total: categorias.length },
-    { id: "itens" as const, label: "Itens", n: pendentesItem, total: itens.length },
+    { id: "itens" as const, label: "Itens", n: pendentesItem, total: itens.filter((i) => i.relevante).length },
     { id: "vendedores" as const, label: "Vendedores", n: pendentesVend, total: vendedores.length },
   ];
 
@@ -93,9 +121,45 @@ export default function MapaClient({
 
       {aba === "vendedores" ? (
         <TabelaVendedores vendedores={vendedores} sellers={sellers} />
+      ) : aba === "categorias" ? (
+        <TabelaLinhas linhas={categorias} tipo="categoria" />
       ) : (
-        <TabelaLinhas linhas={aba === "categorias" ? categorias : itens} tipo={aba === "categorias" ? "categoria" : "item"} />
+        <TabelaItens itens={itens} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Itens, com os irrelevantes escondidos por padrão.
+ *
+ * A categoria da venda resolve a linha de receita em quase todo caso. O item só
+ * é necessário quando a venda chegou SEM categoria — o que acontece em toda
+ * venda que nasce no site. Mostrar os outros é pedir trabalho que não produz
+ * nada, e foi o que inviabilizou a primeira versão desta tela.
+ */
+function TabelaItens({ itens }: { itens: LinhaMapa[] }) {
+  const [verTodos, setVerTodos] = useState(false);
+  const relevantes = itens.filter((i) => i.relevante);
+  const resto = itens.length - relevantes.length;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="max-w-3xl text-xs leading-relaxed text-white/50">
+        Aparecem aqui só os itens que vieram em <strong>venda sem categoria</strong> — são os
+        únicos em que classificar muda alguma coisa. Nos demais, a categoria da venda já resolve a
+        linha de receita.
+      </p>
+      <TabelaLinhas linhas={verTodos ? itens : relevantes} tipo="item" />
+      {resto > 0 ? (
+        <button
+          type="button"
+          onClick={() => setVerTodos((v) => !v)}
+          className="self-start text-xs text-white/40 underline underline-offset-4 hover:text-white/70"
+        >
+          {verTodos ? `Esconder os ${resto} itens que não precisam` : `Ver também os ${resto} itens que não precisam`}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -134,9 +198,10 @@ function TabelaLinhas({ linhas, tipo }: { linhas: LinhaMapa[]; tipo: "categoria"
 function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
   const router = useRouter();
   const [salvando, startTransition] = useTransition();
-  const [bu, setBu] = useState(linha.bu ?? "");
+  const sug = linha.product_line || linha.ignorar ? null : palpite(linha.ca_nome);
+  const [bu, setBu] = useState(linha.bu ?? sug?.bu ?? "");
   const [pl, setPl] = useState(linha.product_line ?? "");
-  const [conta, setConta] = useState(linha.conta_vendedor);
+  const [conta, setConta] = useState(linha.conta_vendedor || (sug?.conta ?? false));
   const [ignorar, setIgnorar] = useState(linha.ignorar);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -169,7 +234,20 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
   return (
     <tr className="border-t border-[var(--hair)]">
       <td className="py-2 pr-3 align-top">
-        <p className={pendente ? "font-medium" : "text-white/60"}>{linha.ca_nome || linha.ca_id}</p>
+        {linha.ca_nome ? (
+          <p className={pendente ? "font-medium" : "text-white/60"}>{linha.ca_nome}</p>
+        ) : (
+          <p className="font-medium text-white/40">
+            sem nome ainda
+            <span className="ml-1.5 font-mono text-[10px] text-white/25">{linha.ca_id.slice(0, 8)}</span>
+          </p>
+        )}
+        {sug ? (
+          <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
+            <Sparkles className="h-3 w-3" />
+            sugerido pelo nome: {BU_NOME[sug.bu]} · {sug.conta ? "conta p/ vendedor" : "não conta"}
+          </p>
+        ) : null}
         {linha.sugestao ? (
           <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
             <Sparkles className="h-3 w-3" />
