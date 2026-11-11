@@ -20,7 +20,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Sparkles, Wand2 } from "lucide-react";
 
 import { COLOR } from "@/lib/brand";
 import type { LinhaMapa, VendedorMapa } from "@/lib/ca/mapa";
@@ -81,6 +81,8 @@ export default function MapaClient({
           sem categoria nenhuma, e matrícula do Colégio, onde a série só aparece no nome do item.
           Quando os dois existem, o item tem a palavra final.
         </p>
+        <AplicarTudo pendentes={pendentesCat + pendentesItem + pendentesVend} />
+
         <div className="inline-flex rounded-xl border border-border bg-panel p-1">
           {abas.map((a) => (
             <button
@@ -119,6 +121,65 @@ export default function MapaClient({
  * venda que nasce no site. Mostrar os outros é pedir trabalho que não produz
  * nada, e foi o que inviabilizou a primeira versão desta tela.
  */
+/**
+ * Aplica todas as sugestões de uma vez.
+ *
+ * Existe porque a primeira versão desta tela mentia: ela mostrava as sugestões
+ * já preenchidas nos campos, mas aquilo era estado do formulário — só gravava
+ * ao clicar o visto de cada linha. Quem via tudo preenchido mandava reprocessar
+ * e recebia zero, com R$ 414 mil parados em pendência sem nenhum aviso.
+ *
+ * O servidor recalcula o palpite e grava; nada vem do formulário. E nenhuma
+ * linha já classificada é tocada.
+ */
+function AplicarTudo({ pendentes }: { pendentes: number }) {
+  const router = useRouter();
+  const [rodando, setRodando] = useState(false);
+  const [r, setR] = useState<{ categorias: number; itens: number; vendedores: number; semSugestao: string[] } | null>(null);
+  const [, startTransition] = useTransition();
+
+  if (pendentes === 0 && !r) return null;
+
+  async function aplicar() {
+    setRodando(true);
+    setR(null);
+    try {
+      const res = await fetch("/api/ca/mapa/aplicar", { method: "POST" });
+      const j = await res.json();
+      if (res.ok) {
+        setR(j);
+        startTransition(() => router.refresh());
+      } else {
+        setR({ categorias: 0, itens: 0, vendedores: 0, semSugestao: [j.error ?? "falhou"] });
+      }
+    } finally {
+      setRodando(false);
+    }
+  }
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3">
+      <button type="button" onClick={aplicar} disabled={rodando} className="btn btn-primary">
+        <Wand2 className="mr-1.5 inline h-3.5 w-3.5" />
+        {rodando ? "Aplicando..." : `Aplicar as ${pendentes} sugestões`}
+      </button>
+      {r ? (
+        <span className="text-xs" style={{ color: COLOR.ok }}>
+          {r.categorias} categorias · {r.itens} itens · {r.vendedores} vendedores classificados.
+          {r.semSugestao.length ? (
+            <span className="ml-1" style={{ color: COLOR.warning }}>
+              {r.semSugestao.length} sem sugestão — resolva na mão: {r.semSugestao.slice(0, 3).join(", ")}
+              {r.semSugestao.length > 3 ? "…" : ""}
+            </span>
+          ) : (
+            " Agora aperte Reprocessar em Conexão e sync."
+          )}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function TabelaItens({ itens }: { itens: LinhaMapa[] }) {
   const [verTodos, setVerTodos] = useState(false);
   const relevantes = itens.filter((i) => i.relevante);
@@ -215,7 +276,13 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
   const opcoes = LINHAS_POR_BU[bu] ?? [];
 
   return (
-    <tr className="border-t border-[var(--hair)]">
+    <tr
+      className="border-t border-[var(--hair)]"
+      // Borda dourada à esquerda = a sugestão está no campo mas NÃO está salva.
+      // Sem esta marca, o formulário preenchido parece decidido — e foi assim
+      // que uma tela "pronta" produziu zero no Reprocessar.
+      style={sug ? { boxShadow: `inset 3px 0 0 ${COLOR.gold}` } : undefined}
+    >
       <td className="py-2 pr-3 align-top">
         {linha.ca_nome ? (
           <p className={pendente ? "font-medium" : "text-white/60"}>{linha.ca_nome}</p>
@@ -228,7 +295,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
         {sug ? (
           <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
             <Sparkles className="h-3 w-3" />
-            sugerido: {sug.porque}
+            sugerido: {sug.porque} — <strong>não salvo</strong>
           </p>
         ) : null}
         {linha.sugestao ? (
@@ -290,7 +357,13 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
             <input type="checkbox" checked={ignorar} onChange={(e) => setIgnorar(e.target.checked)} />
             ignorar
           </label>
-          <button type="button" onClick={salvar} disabled={salvando} className="btn btn-ghost !px-2 !py-1">
+          <button
+            type="button"
+            onClick={salvar}
+            disabled={salvando}
+            title={sug ? "Salvar a sugestão" : "Salvar"}
+            className={`btn !px-2 !py-1 ${sug ? "btn-primary" : "btn-ghost"}`}
+          >
             <Check className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -368,7 +441,7 @@ function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: stri
         {sug ? (
           <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
             <Sparkles className="h-3 w-3" />
-            sugerido: {sug.porque}
+            sugerido: {sug.porque} — <strong>não salvo</strong>
           </p>
         ) : null}
         {erro ? (
