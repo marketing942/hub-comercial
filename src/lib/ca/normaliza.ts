@@ -32,6 +32,7 @@ import {
   UNICIVE_PRODUCT_IDS,
 } from "@/lib/products";
 import { situacaoConta } from "./config";
+import { lerPorChaves, lerTudo } from "./ler";
 
 /**
  * As linhas de receita que `sales`/`direct_sales` aceitam.
@@ -93,42 +94,49 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
   const r = vazio();
 
   // ---- 1. Lê o espelho da janela -----------------------------------------
-  const { data: vendasRaw, error: eV } = await supabaseAdmin
-    .from("ca_vendas")
-    .select("ca_id, data, situacao, versao, cliente_ca_id, vendedor_ca_id, categoria_ca_id")
-    .gte("data", de)
-    .lte("data", ate)
-    .limit(20000);
-  if (eV) throw new Error(`ca_vendas: ${eV.message}`);
-  const vendas = (vendasRaw ?? []).filter((v) => situacaoConta(v.situacao as string));
+  /**
+   * PAGINADO. `.limit(20000)` não levanta o teto: o PostgREST corta em 1.000 e
+   * não avisa. Em 11/11/2026 esta leitura devolvia 1.000 de 1.546 vendas e a
+   * normalização perdia 35% do faturamento em silêncio.
+   */
+  const vendasRaw = await lerTudo<{
+    ca_id: string;
+    data: string;
+    situacao: string | null;
+    versao: number | null;
+    cliente_ca_id: string | null;
+    vendedor_ca_id: string | null;
+    categoria_ca_id: string | null;
+  }>("ca_vendas", "ca_id, data, situacao, versao, cliente_ca_id, vendedor_ca_id, categoria_ca_id", {
+    filtrar: (q) => (q as never as { gte: Function }).gte("data", de).lte("data", ate),
+  });
+  const vendas = vendasRaw.filter((v) => situacaoConta(v.situacao));
   r.vendasConsideradas = vendas.length;
 
   const vendaIds = vendas.map((v) => v.ca_id as string);
-  const itens: { ca_id: string; venda_ca_id: string; item_ca_id: string | null; nome: string | null; quantidade: number; valor: number }[] = [];
-  for (let i = 0; i < vendaIds.length; i += 300) {
-    const { data } = await supabaseAdmin
-      .from("ca_venda_itens")
-      .select("ca_id, venda_ca_id, item_ca_id, nome, quantidade, valor")
-      .in("venda_ca_id", vendaIds.slice(i, i + 300));
-    for (const it of data ?? [])
-      itens.push({
-        ca_id: it.ca_id as string,
-        venda_ca_id: it.venda_ca_id as string,
-        item_ca_id: (it.item_ca_id as string) ?? null,
-        nome: (it.nome as string) ?? null,
-        quantidade: Number(it.quantidade ?? 1),
-        valor: Number(it.valor ?? 0),
-      });
-  }
+  const itensRaw = await lerPorChaves<Record<string, unknown>>(
+    "ca_venda_itens",
+    "ca_id, venda_ca_id, item_ca_id, nome, quantidade, valor",
+    "venda_ca_id",
+    vendaIds,
+  );
+  const itens = itensRaw.map((it) => ({
+    ca_id: it.ca_id as string,
+    venda_ca_id: it.venda_ca_id as string,
+    item_ca_id: (it.item_ca_id as string) ?? null,
+    nome: (it.nome as string) ?? null,
+    quantidade: Number(it.quantidade ?? 1),
+    valor: Number(it.valor ?? 0),
+  }));
 
   // ---- 2. Mapas ----------------------------------------------------------
-  const { data: mapaRaw } = await supabaseAdmin
-    .from("ca_mapa_receita")
-    .select("ca_tipo, ca_id, bu, product_line, conta_vendedor, ignorar")
-    .limit(5000);
+  const mapaRaw = await lerTudo<Record<string, unknown>>(
+    "ca_mapa_receita",
+    "ca_tipo, ca_id, bu, product_line, conta_vendedor, ignorar",
+  );
   const mapaCategoria = new Map<string, MapaLinha>();
   const mapaItem = new Map<string, MapaLinha>();
-  for (const m of mapaRaw ?? []) {
+  for (const m of mapaRaw) {
     const linha: MapaLinha = {
       bu: (m.bu as string) ?? null,
       product_line: (m.product_line as string) ?? null,
@@ -138,12 +146,13 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
     (m.ca_tipo === "item" ? mapaItem : mapaCategoria).set(m.ca_id as string, linha);
   }
 
-  const { data: vendRaw } = await supabaseAdmin
-    .from("ca_vendedores")
-    .select("ca_vendedor_id, destino, seller_id")
-    .limit(2000);
+  const vendRaw = await lerTudo<Record<string, unknown>>(
+    "ca_vendedores",
+    "ca_vendedor_id, destino, seller_id",
+    { ordenarPor: "ca_vendedor_id" },
+  );
   const mapaVendedor = new Map<string, { destino: Destino; seller_id: string | null }>();
-  for (const v of vendRaw ?? [])
+  for (const v of vendRaw)
     mapaVendedor.set(v.ca_vendedor_id as string, {
       destino: (v.destino as Destino) ?? "pendente",
       seller_id: (v.seller_id as string) ?? null,

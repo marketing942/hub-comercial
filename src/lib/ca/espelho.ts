@@ -13,6 +13,7 @@
  * Pendência é dinheiro invisível.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import { lerTudo } from "./ler";
 
 /**
  * Descobre categorias e itens ainda não mapeados e os insere como PENDENTES.
@@ -24,21 +25,20 @@ export async function descobrirPendencias(): Promise<{ categorias: number; itens
   const agora = new Date().toISOString();
 
   // Categorias usadas em vendas que contam.
-  const { data: cats } = await supabaseAdmin
-    .from("ca_vendas")
-    .select("categoria_ca_id")
-    .not("categoria_ca_id", "is", null)
-    .limit(10000);
-  const catIds = [...new Set((cats ?? []).map((c) => c.categoria_ca_id as string))];
+  // PAGINADO: `.limit(N)` não levanta o teto de 1.000 do PostgREST (ver ./ler.ts).
+  const cats = await lerTudo<{ categoria_ca_id: string }>("ca_vendas", "ca_id, categoria_ca_id", {
+    filtrar: (q) => (q as never as { not: Function }).not("categoria_ca_id", "is", null),
+  });
+  const catIds = [...new Set(cats.map((c) => c.categoria_ca_id))];
 
   // Itens — necessários para venda SEM categoria e para a série do Colégio.
-  const { data: its } = await supabaseAdmin
-    .from("ca_venda_itens")
-    .select("item_ca_id, nome")
-    .not("item_ca_id", "is", null)
-    .limit(20000);
+  const its = await lerTudo<{ item_ca_id: string; nome: string | null }>(
+    "ca_venda_itens",
+    "ca_id, item_ca_id, nome",
+    { filtrar: (q) => (q as never as { not: Function }).not("item_ca_id", "is", null) },
+  );
   const porItem = new Map<string, string>();
-  for (const i of its ?? []) porItem.set(i.item_ca_id as string, (i.nome as string) ?? "");
+  for (const i of its) porItem.set(i.item_ca_id, i.nome ?? "");
 
   const linhas = [
     ...catIds.map((id) => ({ ca_tipo: "categoria", ca_id: id, visto_em: agora })),
@@ -53,13 +53,13 @@ export async function descobrirPendencias(): Promise<{ categorias: number; itens
   }
 
   // Vendedores vistos no CA.
-  const { data: vends } = await supabaseAdmin
-    .from("ca_vendas")
-    .select("vendedor_ca_id, vendedor_nome")
-    .not("vendedor_ca_id", "is", null)
-    .limit(10000);
+  const vends = await lerTudo<{ vendedor_ca_id: string; vendedor_nome: string | null }>(
+    "ca_vendas",
+    "ca_id, vendedor_ca_id, vendedor_nome",
+    { filtrar: (q) => (q as never as { not: Function }).not("vendedor_ca_id", "is", null) },
+  );
   const porVendedor = new Map<string, string>();
-  for (const v of vends ?? []) porVendedor.set(v.vendedor_ca_id as string, (v.vendedor_nome as string) ?? "");
+  for (const v of vends) porVendedor.set(v.vendedor_ca_id, v.vendedor_nome ?? "");
   if (porVendedor.size) {
     await supabaseAdmin.from("ca_vendedores").upsert(
       [...porVendedor].map(([id, nome]) => ({ ca_vendedor_id: id, ca_nome: nome, visto_em: agora })),

@@ -16,6 +16,7 @@
  * sozinha no dia em que alguém lançar um lote errado — e muda em silêncio.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import { lerTudo } from "./ler";
 
 /** Piso para sugerir: abaixo disso é palpite, não evidência. */
 export const SUGESTAO_MIN_OCORRENCIAS = 5;
@@ -54,13 +55,11 @@ export interface LinhaMapa {
 
 /** Nome legível das categorias, lido das próprias vendas + o mapa já classificado. */
 async function nomesDeCategoria(): Promise<Map<string, string>> {
-  const { data } = await supabaseAdmin
-    .from("ca_mapa_receita")
-    .select("ca_id, ca_nome")
-    .eq("ca_tipo", "categoria")
-    .limit(2000);
+  const data = await lerTudo<{ ca_id: string; ca_nome: string | null }>("ca_mapa_receita", "ca_id, ca_nome", {
+    filtrar: (q) => (q as never as { eq: Function }).eq("ca_tipo", "categoria"),
+  });
   const m = new Map<string, string>();
-  for (const r of data ?? []) m.set(r.ca_id as string, (r.ca_nome as string) ?? (r.ca_id as string));
+  for (const r of data) m.set(r.ca_id, r.ca_nome ?? r.ca_id);
   return m;
 }
 
@@ -184,7 +183,7 @@ async function itensRelevantes(): Promise<Set<string>> {
 
 export async function listarMapa(): Promise<{ categorias: LinhaMapa[]; itens: LinhaMapa[] }> {
   const [{ data: linhas }, nomes, sug, vol, relevantes] = await Promise.all([
-    supabaseAdmin.from("ca_mapa_receita").select("*").limit(5000),
+    lerTudo<Record<string, unknown>>("ca_mapa_receita", "*").then((data) => ({ data })),
     nomesDeCategoria(),
     sugestoesPorItem(),
     volumes(),
@@ -246,7 +245,7 @@ export interface VendedorMapa {
 
 export async function listarVendedores(): Promise<VendedorMapa[]> {
   const [{ data: mapa }, agg] = await Promise.all([
-    supabaseAdmin.from("ca_vendedores").select("*").limit(2000),
+    lerTudo<Record<string, unknown>>("ca_vendedores", "*", { ordenarPor: "ca_vendedor_id" }).then((data) => ({ data })),
     (async () => {
       const m = new Map<string, { vendas: number; valor: number }>();
       for (let f = 0; ; f += 1000) {

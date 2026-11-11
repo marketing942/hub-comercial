@@ -13,6 +13,7 @@
  * invariante de nunca tocar linha manual.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import { lerTudo } from "./ler";
 
 export interface ResultadoEspelho {
   vendas: number;
@@ -92,10 +93,9 @@ export async function gravarEspelho(
    */
   let orfaosRemovidos = 0;
   {
-    const { data } = await supabaseAdmin.from("ca_venda_itens").select("ca_id, venda_ca_id").limit(50000);
-    const orfaos = (data ?? [])
-      .filter((o) => !vivos.has(o.venda_ca_id as string))
-      .map((o) => o.ca_id as string);
+    // PAGINADO — `.limit(50000)` era cortado em 1.000 e deixava órfão para trás.
+    const data = await lerTudo<{ ca_id: string; venda_ca_id: string }>("ca_venda_itens", "ca_id, venda_ca_id");
+    const orfaos = data.filter((o) => !vivos.has(o.venda_ca_id)).map((o) => o.ca_id);
     for (let i = 0; i < orfaos.length; i += 300) {
       const { error } = await supabaseAdmin
         .from("ca_venda_itens")
