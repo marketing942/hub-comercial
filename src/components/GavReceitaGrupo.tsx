@@ -62,8 +62,8 @@ function Tabela({ linhas, cor }: { linhas: LinhaGrupo[]; cor: string }) {
 }
 
 export default function GavReceitaGrupo({ dados }: { dados: ReceitaGrupo }) {
-  const { doGrupo, semDono, totalSemDono } = dados;
-  if (doGrupo.length === 0 && semDono.length === 0) return null;
+  const { doGrupo, semDono, totalSemDono, heranca, herdados } = dados;
+  if (doGrupo.length === 0 && semDono.length === 0 && !herdados) return null;
 
   return (
     <section className="panel mb-4 p-4">
@@ -73,6 +73,30 @@ export default function GavReceitaGrupo({ dados }: { dados: ReceitaGrupo }) {
           só existe na origem Conta Azul
         </span>
       </div>
+
+      {/*
+        A herança move dinheiro para o painel de alguém, então ela é dita por
+        extenso. Um valor que aparece na comissão de uma pessoa por causa de uma
+        regra que ninguém leu é pior que um valor parado em "sem dono".
+      */}
+      {herdados ? (
+        <p
+          className="mb-3 rounded-lg px-3 py-2 text-xs leading-relaxed"
+          style={{ background: `${COLOR.ok}14`, color: "rgba(255,255,255,.72)" }}
+        >
+          <strong>{herdados.linhas} linhas ({brl(herdados.valor)})</strong> chegaram do Conta Azul
+          sem vendedor e foram para o vendedor da BU — porque a BU tem um vendedor ativo só, então
+          não havia a quem mais ser:{" "}
+          {heranca.map((h, i) => (
+            <span key={h.bu}>
+              {i > 0 ? " · " : ""}
+              <strong>{BU_NOME[h.bu] ?? h.bu} → {h.vendedor}</strong>
+            </span>
+          ))}
+          . Se a BU ganhar um segundo vendedor, a herança para de valer e o valor volta a aparecer
+          aqui em <em>sem dono</em> — em vez de continuar caindo no painel de quem não vendeu.
+        </p>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
         {doGrupo.length > 0 ? (

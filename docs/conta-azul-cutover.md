@@ -1247,28 +1247,61 @@ Novembro, que é o mês em que o pipeline rodou do começo: manual R$ 78.733 × 
 (**+2,7%**), com as matrículas do Colégio fechando **ao centavo** (`matricula_fund_3`, `_7`, `_8`,
 `_9` com delta R$ 0,00) e `turmas_presenciais` com −R$ 23.
 
-### Aberto 8 — a DIRETORIA lança R$ 13.808 que contam para vendedor
+### ✅ Decisão — a série do Colégio não se marca à mão, e o sem-dono vai para o vendedor da BU
 
-`DIRETORIA` está mapeada como `grupo` (correto: não é vendedora), mas 177 linhas lançadas por ela
-**contam** para vendedor — em maioria matrícula do Colégio. Hoje elas aparecem em "sem dono", o que
-é honesto e inútil: ninguém recebe.
+Fechado em 11/11/2026, com estas palavras: *"matrícula é matrícula, o valor quem manda é no CA e a
+gente só precisa distribuir esse valor pro vendedor que é do colégio"*.
 
-As opções não são equivalentes:
+**Nada se marca à mão.** A categoria `1.7 MATRÍCULA COLÉGIO` fica gravada **sem linha**, de
+propósito — não existe "a turma da matrícula do Colégio", e obrigar alguém a escolher uma das 12 no
+formulário da categoria seria pedir uma resposta que não existe. A série sai do nome do item,
+automaticamente: as 12 linhas do Colégio foram preenchidas por `sugestao-aplicada`, zero cliques.
 
-1. **Creditar por regra de linha** — matrícula do Colégio lançada pela DIRETORIA vai para a Giovana
-   (que é a do Colégio). Resolve o valor; cria uma regra que precisa ser revista quando a pessoa do
-   Colégio mudar.
-2. **Corrigir na origem** — quem lança passa a pôr o vendedor certo no Conta Azul. Mais lento, e é a
-   única que também arruma o relatório do próprio Conta Azul.
-3. **Aceitar como receita do grupo** — a matrícula do Colégio não conta para ninguém. Muda a regra
-   fechada em 10/11 ("para o vendedor, só a matrícula conta").
+**A quebra por série continua porque ela é do Hub, não do Conta Azul.** O painel do Colégio mede
+*alunos por turma* (`ColegioTurmasBreakdown`) e `isQtdPrimary` faz da quantidade a métrica primária
+da BU — jogar tudo numa linha só apagaria essa tela. Para quem classifica, no entanto, a quebra é
+invisível: o dado já chega separado.
 
-Isto move comissão, então é decisão do requisitante, não do código.
+**O sem-dono passou a ter herdeiro.** `donoDaBu`, em `normaliza.ts`: linha que conta para vendedor e
+chega sem vendedor que o Hub reconheça vai para o vendedor da BU **quando a BU tem um vendedor ativo
+só**. A regra não escolhe entre pessoas — ela só age onde não há escolha:
+
+| BU | Vendedores ativos | Herda? |
+|---|---|---|
+| Colégio | 1 (Giovana) | ✅ sim — 8 linhas, R$ 3.702 |
+| CPPEM | 3 (Magalhães, Julya, + ) | ❌ fica em "sem dono" |
+| Unicive | 3 (Victor, Pablo, Liliane) | ❌ fica em "sem dono" |
+
+O modo de falhar é o certo: no dia em que o Colégio ganhar um segundo vendedor, a herança para de
+valer e o valor reaparece em "sem dono" na tela — em vez de seguir caindo no painel de quem não
+vendeu. E a tela **diz por extenso** quem herdou e quanto, porque isso move comissão.
+
+### Aberto 8 — a DIRETORIA ainda lança R$ 12.408 do CPPEM
+
+Medido em 11/11 (correção de uma leitura anterior, que dizia "maioria Colégio" e estava errada):
+
+| Vendedor no CA | BU | Linhas | Valor | Situação |
+|---|---|---|---|---|
+| DIRETORIA | CPPEM (turmas, digitais, físicos) | 204 | **R$ 12.408** | sem dono |
+| DIRETORIA | Colégio (matrículas) | 8 | R$ 3.702 | ✅ herdado pela Giovana |
+| DIRETORIA | Unicive | 3 | R$ 365 | sem dono |
+| Elias | CPPEM | 9 | R$ 573 | sem dono |
+
+O CPPEM tem três vendedores ativos, então a herança não se aplica — e não deve: creditar por sorteio
+é pior que deixar visível. Resta escolher entre corrigir o vendedor na origem (arruma também o
+relatório do Conta Azul) ou criar um de-para explícito para o que a DIRETORIA lança no CPPEM.
 
 ### Aberto 9 — "Elias"
 
-Vendedor do Conta Azul que não está na lista dos 6 do Hub e tem R$ 566 de linhas que contam para
-vendedor. Precisa de um destino: vendedor novo, canal direto ou grupo.
+Vendedor do Conta Azul que não está na lista dos 6 do Hub e tem R$ 573 de linhas que contam para
+vendedor, todas CPPEM. Precisa de um destino: vendedor novo, canal direto ou grupo.
+
+### Aberto 10 — duas matrículas do Colégio em vendedor de outra BU
+
+`Liliane` (Unicive) tem 2 matrículas do Colégio (R$ 1.100) e `Timóteo` (CPPEM, inativo) tem 1
+(R$ 659) — com vendedor **explícito** no Conta Azul, não por falta dele. A herança não as toca de
+propósito: sobrescrever uma atribuição explícita é outra regra, bem mais agressiva. Vale notar que o
+histórico manual faz o mesmo (Timóteo com 1 matrícula do Colégio, R$ 900), então pode ser legítimo.
 
 ---
 

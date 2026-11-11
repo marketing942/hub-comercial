@@ -26,6 +26,7 @@
  * classificado, e a categoria é a rede embaixo.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import { buListOf, listSellers } from "@/lib/data";
 import { situacaoConta } from "./config";
 import { lerPorChaves, lerTudo } from "./ler";
 import { LINHAS_VENDEDOR, linhaValida } from "./linhas";
@@ -50,6 +51,9 @@ export interface ResultadoNormalizacao {
   /** Linhas que contam para vendedor mas chegaram sem vendedor mapeado. */
   semDono: number;
   valorSemDono: number;
+  /** Linhas que acharam dono pela BU, por ela ter um vendedor só (ver `donoDaBu`). */
+  herdadosPelaBu: number;
+  valorHerdado: number;
   ignorados: number;
   linhaInvalida: number;
 }
@@ -63,6 +67,8 @@ const vazio = (): ResultadoNormalizacao => ({
   valorPendente: 0,
   semDono: 0,
   valorSemDono: 0,
+  herdadosPelaBu: 0,
+  valorHerdado: 0,
   ignorados: 0,
   linhaInvalida: 0,
 });
@@ -140,6 +146,39 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
       destino: (v.destino as Destino) ?? "pendente",
       seller_id: (v.seller_id as string) ?? null,
     });
+
+  /**
+   * O dono da BU: para quem vai a linha que conta para vendedor e chegou sem
+   * vendedor que o Hub reconheça.
+   *
+   * ## Por que a regra é "a BU tem UM vendedor ativo"
+   *
+   * Matrícula do Colégio quase toda é lançada no Conta Azul pela DIRETORIA, que
+   * não é vendedora — então a linha conta para alguém e não achava ninguém, e
+   * ficava parada em "sem dono". Só que matrícula do Colégio **é** da pessoa do
+   * Colégio: o valor quem manda é o Conta Azul, e distribuir é o que falta.
+   *
+   * A regra não escolhe entre pessoas. Ela só age onde não há escolha a fazer:
+   * BU com exatamente um vendedor ativo. Medido em 11/11/2026 — Colégio: só a
+   * Giovana, então as 8 matrículas da DIRETORIA (R$ 3.702) vão para ela. CPPEM
+   * tem 3 ativos e Unicive 3, então os R$ 12.408 da DIRETORIA no CPPEM
+   * continuam em "sem dono", visíveis, esperando alguém dizer de quem são.
+   *
+   * O modo de falhar é o certo: no dia em que o Colégio ganhar um segundo
+   * vendedor, a herança para de valer e o valor volta a aparecer em "sem dono"
+   * na tela — em vez de continuar caindo no painel de quem não vendeu.
+   */
+  const donoDaBu = new Map<string, string>();
+  {
+    const ativos = await listSellers({ onlyActive: true });
+    const porBu = new Map<string, string[]>();
+    for (const sel of ativos) {
+      for (const bu of buListOf(sel)) {
+        porBu.set(bu, [...(porBu.get(bu) ?? []), sel.id]);
+      }
+    }
+    for (const [bu, ids] of porBu) if (ids.length === 1) donoDaBu.set(bu, ids[0]);
+  }
 
   // ---- 3. Classifica cada item -------------------------------------------
   const paraSales: Record<string, unknown>[] = [];
@@ -237,8 +276,17 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
         paraDireto.push({ ...base, channel: "direto" });
         continue;
       }
-      // 'grupo' e 'pendente': conta para vendedor, mas não há vendedor. É a
-      // "venda sem dono" — fica visível em vez de sumir.
+      // 'grupo' e 'pendente': conta para vendedor, mas não há vendedor.
+      // Se a BU tem um vendedor só, é dele — não há a quem mais ser.
+      const herdeiro = escolhido.bu ? donoDaBu.get(escolhido.bu) : undefined;
+      if (herdeiro) {
+        r.herdadosPelaBu++;
+        r.valorHerdado += it.valor;
+        paraSales.push({ ...base, seller_id: herdeiro });
+        continue;
+      }
+
+      // Sem herdeiro: fica visível em "sem dono" em vez de sumir.
       r.semDono++;
       r.valorSemDono += it.valor;
       paraGrupo.push({

@@ -24,7 +24,7 @@ import { supabaseAdmin } from "./supabase";
 import { lerTudo } from "./ca/ler";
 import { ROTULOS_GRUPO } from "./ca/linhas";
 import { productLabel } from "./products";
-import { statsForAll } from "./data";
+import { buListOf, listSellers, statsForAll } from "./data";
 import type { SellerStats } from "./calc";
 import type { Fonte } from "./fonte";
 import { FONTE_PADRAO } from "./fonte";
@@ -239,6 +239,15 @@ export type ReceitaGrupo = {
   semDono: LinhaGrupo[];
   totalGrupo: number;
   totalSemDono: number;
+  /**
+   * A herança por BU, explicada na tela.
+   *
+   * O normalizador manda a linha sem dono para o vendedor da BU quando a BU tem
+   * um vendedor ativo só. Isso move dinheiro para o painel de alguém, então não
+   * pode ser invisível: a tela diz quem herda, quanto herdou e por quê.
+   */
+  heranca: { bu: string; vendedor: string }[];
+  herdados: { linhas: number; valor: number } | null;
 };
 
 export async function receitaDoGrupo(year: number, month: number): Promise<ReceitaGrupo> {
@@ -272,11 +281,30 @@ export async function receitaDoGrupo(year: number, month: number): Promise<Recei
 
   const doGrupo = juntar((l) => !l.conta_vendedor);
   const semDono = juntar((l) => l.conta_vendedor);
+
+  // Quem herda: a mesma regra do normalizador — BU com um vendedor ativo só.
+  const ativos = await listSellers({ onlyActive: true });
+  const porBu = new Map<string, { id: string; name: string }[]>();
+  for (const sel of ativos) {
+    for (const bu of buListOf(sel)) porBu.set(bu, [...(porBu.get(bu) ?? []), { id: sel.id, name: sel.name }]);
+  }
+  const heranca = [...porBu]
+    .filter(([, ids]) => ids.length === 1)
+    .map(([bu, ids]) => ({ bu, vendedor: ids[0].name }));
+
+  // Quanto a última normalização de fato herdou — o número do processo, não um
+  // recálculo paralelo que poderia discordar dele.
+  const { data: sync } = await supabaseAdmin.from("ca_sync").select("resumo").eq("recurso", "vendas").maybeSingle();
+  const n = (sync?.resumo as { normalizacao?: { herdadosPelaBu?: number; valorHerdado?: number } } | null)?.normalizacao;
+  const herdados = n && (n.herdadosPelaBu ?? 0) > 0 ? { linhas: n.herdadosPelaBu ?? 0, valor: n.valorHerdado ?? 0 } : null;
+
   return {
     doGrupo,
     semDono,
     totalGrupo: doGrupo.reduce((s, l) => s + l.valor, 0),
     totalSemDono: semDono.reduce((s, l) => s + l.valor, 0),
+    heranca,
+    herdados,
   };
 }
 
