@@ -495,7 +495,75 @@ ver `CLAUDE.md` §4). Pendentes primeiro, com nome do CA, quanto já movimentara
 linha e `conta_vendedor`. Sem esta tela, cada item novo precisa de SQL na mão e a integração para de
 ser mantida em duas semanas.
 
-### 5.4 As linhas de receita precisam crescer
+### 5.4 Vendedor novo: o que acontece sozinho
+
+Pergunta do requisitante (11/11). O caminho é este, e o ponto central é que
+**nada se perde e nada vai para a pessoa errada**:
+
+```
+  cadastra vendedor novo no Conta Azul
+        ↓
+  primeira venda dele entra no espelho
+        ↓
+  o sync descobre o ca_vendedor_id novo → destino = 'pendente'   ← o default
+        ↓
+  a receita vai para ca_receita marcada "conta p/ vendedor, sem dono"
+        ↓
+  aparece como VENDA SEM DONO na barra de meta + aviso no painel do GAV
+        ↓
+  admin liga o cadastro ao vendedor do Hub em GAV › Classificação
+        ↓
+  Reprocessar → as vendas caem em `sales`, no vendedor certo
+```
+
+**`pendente` é o único default seguro.** Com `vendedor`, um cadastro novo
+herdaria vendas por acidente — e comissão junto. Com `grupo`, a receita sumiria
+do ranking sem ninguém notar. Pendente é o único estado que obriga alguém a
+decidir, e o aviso é o que impede que a decisão fique para depois.
+
+O aviso de pendências fica no **painel** do GAV, não só na aba de Classificação:
+sem isso, um vendedor novo dependeria de alguém lembrar de abrir a outra tela, e
+a venda dele ficaria sem dono em silêncio — exatamente o caso que a barra de
+alerta existe para pegar.
+
+### 5.5 O pré-preenchimento
+
+Classificar à mão o que o sistema consegue deduzir é desperdício — mas deduzir
+sozinho em produção é pior. O meio-termo: a tela chega preenchida com o selo
+**"sugerido: …"**, e um clique confirma. `src/lib/ca/sugestao.ts`.
+
+**Categoria → BU, linha e regra**, por palavra no nome:
+
+| nome contém | sugere |
+|---|---|
+| `MATRÍCULA UNICIVE` | unicive · `matriculas` · conta |
+| `MATRÍCULA COLÉGIO` | colegio_cppem · **sem linha** · conta |
+| `MENSALIDADE` · `REPASSE` | a BU do nome · sem linha · **não conta** |
+| `FARDAMENTO` | colegio_cppem · `fardamentos` · **não conta** |
+| `LIVRO` · `EVENTO DO COLÉGIO` | colegio_cppem · sem linha · **não conta** |
+| `MENTORIA` · `CURSO ONLINE` · `TURMA PRESENCIAL` · `MATERIAIS` · `SUPLETIVO` | cppem · a linha correspondente · conta |
+| `FRETE` · `MULTA` · `RENDIMENTO` · `EMPRÉSTIMO` | **ignorar** |
+
+`MATRÍCULA COLÉGIO` fica sem linha de propósito: são 12 séries e só o nome do
+item diz qual.
+
+> **Por que ler texto é seguro aqui, e não no catálogo de itens.** As categorias
+> são uma lista curta mantida pela contabilidade, com vocabulário próprio e
+> estável. Os itens são nomes livres de produto, onde `MENSALIDADE - 6º Ano` e
+> `EBOOK - MENSAL COLÉGIO 6 FUND` são a mesma coisa — por isso lá o palpite vem
+> do histórico do item (§3.5), não do texto.
+
+**Vendedor do CA → vendedor do Hub**, por nome normalizado: sem acento, sem
+caixa e **sem letra repetida**, o que faz `Lilliane` e `Liliane` casarem — os
+dois cadastros da mesma pessoa. `SITE / DIRETO` vira `canal_direto`; `DIRETORIA`
+e `Contador` viram `grupo`.
+
+Casar por nome é o único caminho possível (o `ca_vendedor_id` é um UUID do Conta
+Azul e o `seller_id` é um UUID do Hub, sem nada em comum até alguém ligar os
+dois uma vez) **e por isso tem de ser sugestão**: um "Victor" novo no Conta Azul
+não pode herdar as vendas do Victor que já existe só porque o nome bate.
+
+### 5.6 As linhas de receita precisam crescer
 
 As 23 linhas atuais não têm mensalidade (§2.2). Para o painel do grupo, proponho **acrescentar** —
 sem mexer nas 23, que continuam governando meta e ranking:

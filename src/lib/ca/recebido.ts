@@ -128,8 +128,21 @@ export async function gravarEspelho(
    * conta_vendedor, ignorar) não é tocada — atualizar o nome nunca pode
    * desclassificar nada.
    */
+  /**
+   * SÓ as categorias que aparecem nas vendas desta janela.
+   *
+   * O Jarvis manda o cadastro inteiro de `fin_categorias` — 113 linhas, a maior
+   * parte DESPESA ("Salário", "IPTU", "FGTS", "Honorários Contábeis"). Sem este
+   * filtro elas entram na fila de classificação e alguém é convidado a dizer a
+   * que BU pertence o IPTU. Aconteceu na primeira rodada: 12 categorias viraram
+   * 40.
+   *
+   * Filtrar aqui, e não no Jarvis, porque é o Hub que sabe quais categorias as
+   * SUAS vendas usam — e assim a correção não exige um rebuild do Jarvis.
+   */
+  const usadas = new Set(vendas.map((v) => v.categoria_ca_id).filter(Boolean) as string[]);
   const categorias = (categoriasRaw as Record<string, unknown>[])
-    .filter((c) => txt(c?.ca_id))
+    .filter((c) => txt(c?.ca_id) && usadas.has(txt(c.ca_id)!))
     .map((c) => ({
       ca_tipo: "categoria" as const,
       ca_id: txt(c.ca_id)!,
