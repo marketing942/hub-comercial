@@ -292,9 +292,24 @@ export async function receitaDoGrupo(year: number, month: number): Promise<Recei
     .filter(([, ids]) => ids.length === 1)
     .map(([bu, ids]) => ({ bu, vendedor: ids[0].name }));
 
-  // Quanto a última normalização de fato herdou — o número do processo, não um
-  // recálculo paralelo que poderia discordar dele.
-  const { data: sync } = await supabaseAdmin.from("ca_sync").select("resumo").eq("recurso", "vendas").maybeSingle();
+  /**
+   * Quanto a última normalização de fato herdou — o número do processo, não um
+   * recálculo paralelo que poderia discordar dele.
+   *
+   * Lê a rodada mais RECENTE, não uma linha fixa: `ca_sync` tem um registro por
+   * `recurso`, e o botão "Reprocessar" grava em `reprocessamento` enquanto o
+   * empurrão do Jarvis grava em `vendas`. Filtrar só por `vendas` fazia a nota
+   * desaparecer depois de todo reprocesso manual — exatamente quando alguém
+   * acabou de classificar algo e quer ver o efeito.
+   */
+  const { data: syncs } = await supabaseAdmin
+    .from("ca_sync")
+    .select("resumo, concluido_em")
+    .order("concluido_em", { ascending: false })
+    .limit(5);
+  const sync = (syncs ?? []).find(
+    (x) => (x.resumo as { normalizacao?: unknown } | null)?.normalizacao,
+  );
   const n = (sync?.resumo as { normalizacao?: { herdadosPelaBu?: number; valorHerdado?: number } } | null)?.normalizacao;
   const herdados = n && (n.herdadosPelaBu ?? 0) > 0 ? { linhas: n.herdadosPelaBu ?? 0, valor: n.valorHerdado ?? 0 } : null;
 
