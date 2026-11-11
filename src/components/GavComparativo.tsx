@@ -162,8 +162,9 @@ export default function GavComparativo({ dados }: { dados: Comparacao }) {
       <p className="mt-3 text-[11px] leading-relaxed text-white/40">
         Vire a chave do cutover quando a diferença estiver dentro de{" "}
         <strong>{Math.round(TOLERANCIA * 100)}%</strong> <strong>por vendedor</strong> — não apenas
-        no total. Mensalidade, repasse e fardamento não contam para vendedor e por isso não aparecem
-        aqui: eles existem só na origem Conta Azul e não têm contraparte manual.
+        no total. Mensalidade, repasse, fardamento e evento não contam para vendedor e por isso não
+        entram nesta tabela — eles não têm contraparte manual com que comparar. Estão logo abaixo,
+        em <strong>Receita fora do painel de vendedor</strong>.
       </p>
     </section>
   );

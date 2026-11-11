@@ -26,26 +26,9 @@
  * classificado, e a categoria é a rede embaixo.
  */
 import { supabaseAdmin } from "@/lib/supabase";
-import {
-  COLEGIO_PRODUCT_IDS,
-  CPPEM_PRODUCT_IDS,
-  UNICIVE_PRODUCT_IDS,
-} from "@/lib/products";
 import { situacaoConta } from "./config";
 import { lerPorChaves, lerTudo } from "./ler";
-
-/**
- * As linhas de receita que `sales`/`direct_sales` aceitam.
- *
- * Validar aqui não é preciosismo: `buFromProductLine()` devolve `cppem` para
- * qualquer linha desconhecida, **sem erro**. Uma linha nova digitada errada no
- * mapa viraria faturamento do CPPEM em silêncio.
- */
-const LINHAS_VALIDAS = new Set<string>([
-  ...CPPEM_PRODUCT_IDS,
-  ...UNICIVE_PRODUCT_IDS,
-  ...COLEGIO_PRODUCT_IDS,
-]);
+import { LINHAS_VENDEDOR, linhaValida } from "./linhas";
 
 type Destino = "vendedor" | "canal_direto" | "grupo" | "pendente";
 
@@ -215,6 +198,13 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
       // Não conta para vendedor (mensalidade, repasse, fardamento, livros,
       // eventos do Colégio): receita do GRUPO, fora de `sales` por desenho.
       if (!escolhido.conta_vendedor) {
+        // Vale a linha do vendedor OU uma linha só-do-grupo (ver ./linhas.ts).
+        // Sem esta checagem, um id digitado errado no mapa viraria uma linha
+        // de receita inventada que ninguém reconhece no painel.
+        if (!linhaValida(escolhido.product_line, false)) {
+          r.linhaInvalida++;
+          continue;
+        }
         paraGrupo.push({
           ca_venda_id: vid,
           ca_item_id: it.ca_id,
@@ -232,7 +222,7 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
       }
 
       // Daqui para baixo a linha CONTA para vendedor.
-      if (!LINHAS_VALIDAS.has(escolhido.product_line)) {
+      if (!LINHAS_VENDEDOR.has(escolhido.product_line)) {
         // Linha desconhecida nunca entra em `sales`: `buFromProductLine()` a
         // mandaria para o CPPEM sem avisar ninguém.
         r.linhaInvalida++;

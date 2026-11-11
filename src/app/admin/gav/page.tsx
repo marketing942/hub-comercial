@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
 import GavComparativo from "@/components/GavComparativo";
+import GavReceitaGrupo from "@/components/GavReceitaGrupo";
 import PainelDashboard from "@/components/PainelDashboard";
 import { getSession } from "@/lib/auth";
-import { compararFontes } from "@/lib/gav";
+import { compararFontes, receitaDoGrupo } from "@/lib/gav";
 import { parseYearMonth } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
@@ -36,14 +37,19 @@ export default async function GavPage({
   if (session.role !== "admin") redirect("/dashboard");
 
   const { year, month } = parseYearMonth(searchParams);
-  const comparacao = await compararFontes(year, month);
+  const [comparacao, grupo] = await Promise.all([compararFontes(year, month), receitaDoGrupo(year, month)]);
 
   return (
     <PainelDashboard
       year={year}
       month={month}
       fonte="conta_azul"
-      topo={<GavComparativo dados={comparacao} />}
+      topo={
+        <>
+          <GavComparativo dados={comparacao} />
+          <GavReceitaGrupo dados={grupo} />
+        </>
+      }
     />
   );
 }

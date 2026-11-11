@@ -139,3 +139,82 @@ export function palpitarVendedor(
   }
   return null;
 }
+
+/**
+ * Série do Colégio a partir do nome do item.
+ *
+ * `MATRÍCULA - 9º Ano Ensino Fundamental - COLÉGIO CPPEM` → `matricula_fund_9`.
+ * Devolve `null` quando o nome não tem série.
+ */
+function serieColegio(n: string): string | null {
+  const m = n.match(/(\d+)\s*(?:O|A)?\s*ANO\s+ENSINO\s+(FUNDAMENTAL|MEDIO)/);
+  if (!m) return null;
+  const nth = Number(m[1]);
+  if (m[2] === "FUNDAMENTAL") return nth >= 1 && nth <= 9 ? `matricula_fund_${nth}` : null;
+  return nth >= 1 && nth <= 3 ? `matricula_em_${nth}` : null;
+}
+
+/**
+ * Item → BU e linha de receita, pelo NOME.
+ *
+ * ## Por que aqui o texto vale, e no catálogo em geral não
+ *
+ * O cabeçalho deste arquivo diz que no catálogo de itens o palpite vem do
+ * histórico, não do texto — porque `MENSALIDADE - 6º Ano` e `EBOOK - MENSAL
+ * COLÉGIO 6 FUND` são a mesma coisa com nomes diferentes. Isso continua valendo
+ * para o CPPEM e a Unicive, e é o que a votação por categoria dominante resolve.
+ *
+ * O Colégio é a exceção, e por um motivo estrutural: o histórico **não pode**
+ * responder. A categoria do Conta Azul não tem a série — são 12 séries e duas
+ * categorias (`1.7 MATRÍCULA`, `1.8 MENSALIDADE`) — então nenhuma quantidade de
+ * votos diz se a venda é do 6º ou do 9º ano. Só o nome do item diz. E o nome
+ * dele é taxonomia de verdade aqui: um padrão único, mantido pela secretaria.
+ *
+ * ## As categorias 1.7 e 1.8 estão trocadas nos dados, e isso é esperado
+ *
+ * Medido em 11/11/2026: `1.7 - MATRÍCULA COLÉGIO` contém 7 itens MENSALIDADE
+ * (R$ 4.154) e `1.8 - MENSALIDADE COLÉGIO` contém 2 itens MATRÍCULA (R$ 874).
+ * Quem lança no Conta Azul erra a categoria de vez em quando — e é exatamente
+ * por isso que a precedência do normalizador é item ANTES de categoria. O nome
+ * do item é a fonte da verdade para o Colégio, não a categoria.
+ */
+export function palpitarItem(nome: string | null): PalpiteCategoria | null {
+  if (!nome) return null;
+  const n = normalizar(nome).toUpperCase();
+
+  // ---- Colégio: a série sai do nome ------------------------------------
+  const serie = serieColegio(n);
+  if (serie) {
+    // MENSALIDADE antes de MATRÍCULA: é a palavra que decide se conta para o
+    // vendedor, e vem antes da que decide a linha.
+    if (/MENSALIDADE/.test(n)) {
+      return {
+        bu: "colegio_cppem",
+        product_line: "mensalidade_colegio",
+        conta_vendedor: false,
+        ignorar: false,
+        porque: "mensalidade do Colégio: receita do grupo, não conta para vendedor",
+      };
+    }
+    if (/MATRICULA/.test(n)) {
+      return {
+        bu: "colegio_cppem",
+        product_line: serie,
+        conta_vendedor: true,
+        ignorar: false,
+        porque: `matrícula do Colégio; a série (${serie}) saiu do nome do item`,
+      };
+    }
+  }
+
+  if (/REFORCO/.test(n)) {
+    return { bu: "colegio_cppem", product_line: "reforco_colegio", conta_vendedor: false, ignorar: false, porque: "reforço escolar: receita do grupo" };
+  }
+  if (/DIA DAS CRIANCAS|DIA DOS PAIS|DIA DAS MAES|FESTA JUNINA|EVENT /.test(n)) {
+    return { bu: "colegio_cppem", product_line: "eventos_colegio", conta_vendedor: false, ignorar: false, porque: "evento do Colégio: não vai para vendedor nenhum" };
+  }
+  if (/\bLIVRO/.test(n)) {
+    return { bu: "colegio_cppem", product_line: "livros_colegio", conta_vendedor: false, ignorar: false, porque: "livros não contam para vendedor" };
+  }
+  return null;
+}

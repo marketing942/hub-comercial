@@ -151,19 +151,39 @@ async function volumes(): Promise<{ cat: Map<string, { valor: number; vendas: nu
   return { cat, item };
 }
 
-/** Itens que aparecem em venda SEM categoria — os únicos que mudam alguma coisa. */
-async function itensRelevantes(): Promise<Set<string>> {
-  const semCategoria = new Set<string>();
+/**
+ * Itens cuja classificação muda alguma coisa.
+ *
+ * São os que aparecem em venda que a CATEGORIA não resolve — porque aí o item é
+ * a única fonte da linha de receita. Dois casos, não um:
+ *
+ *  1. venda **sem categoria** (nasceu no site);
+ *  2. venda com categoria classificada **sem linha**, de propósito: `1.7
+ *     MATRÍCULA COLÉGIO` sabe a BU e que conta para vendedor, mas não sabe a
+ *     SÉRIE — são 12, e só o nome do item diz qual.
+ *
+ * O segundo caso faltava, e era o mais caro: os 327 itens do Colégio (R$ 157
+ * mil em 70 dias) ficavam marcados como irrelevantes e nunca entravam na fila
+ * de classificação, então o "Aplicar as sugestões" passava por cima deles.
+ */
+async function itensRelevantes(classificadas: Map<string, { product_line: string | null; ignorar: boolean }>): Promise<Set<string>> {
+  const semLinha = new Set<string>();
   for (let f = 0; ; f += 1000) {
     const { data } = await supabaseAdmin
       .from("ca_vendas")
       .select("ca_id, categoria_ca_id")
-      .is("categoria_ca_id", null)
       .order("ca_id")
       .range(f, f + 999);
-    for (const v of data ?? []) semCategoria.add(v.ca_id as string);
+    for (const v of data ?? []) {
+      const cat = v.categoria_ca_id as string | null;
+      const c = cat ? classificadas.get(cat) : undefined;
+      // Resolvida pela categoria (tem linha, ou foi ignorada de propósito)?
+      if (c && (c.product_line || c.ignorar)) continue;
+      semLinha.add(v.ca_id as string);
+    }
     if ((data ?? []).length < 1000) break;
   }
+  const semCategoria = semLinha;
   const out = new Set<string>();
   if (semCategoria.size === 0) return out;
   for (let f = 0; ; f += 1000) {
@@ -182,16 +202,23 @@ async function itensRelevantes(): Promise<Set<string>> {
 }
 
 export async function listarMapa(): Promise<{ categorias: LinhaMapa[]; itens: LinhaMapa[] }> {
-  const [{ data: linhas }, nomes, sug, vol, relevantes] = await Promise.all([
-    lerTudo<Record<string, unknown>>("ca_mapa_receita", "*").then((data) => ({ data })),
+  const linhas = await lerTudo<Record<string, unknown>>("ca_mapa_receita", "*");
+  // A relevância de um item depende de quais CATEGORIAS já resolvem a linha,
+  // então o mapa é lido antes — não em paralelo com quem precisa dele.
+  const classificadas = new Map<string, { product_line: string | null; ignorar: boolean }>(
+    linhas
+      .filter((l) => l.ca_tipo === "categoria")
+      .map((l) => [l.ca_id as string, { product_line: (l.product_line as string) ?? null, ignorar: !!l.ignorar }]),
+  );
+  const [nomes, sug, vol, relevantes] = await Promise.all([
     nomesDeCategoria(),
     sugestoesPorItem(),
     volumes(),
-    itensRelevantes(),
+    itensRelevantes(classificadas),
   ]);
 
   const montar = (tipo: "categoria" | "item"): LinhaMapa[] =>
-    (linhas ?? [])
+    linhas
       .filter((l) => l.ca_tipo === tipo)
       .map((l) => {
         const id = l.ca_id as string;

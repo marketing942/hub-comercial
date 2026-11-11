@@ -2,19 +2,13 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { listarMapa, listarVendedores } from "@/lib/ca/mapa";
-import { palpitarCategoria, palpitarVendedor } from "@/lib/ca/sugestao";
+import { palpitarCategoria, palpitarItem, palpitarVendedor } from "@/lib/ca/sugestao";
+import { linhaValida, LINHAS_VENDEDOR } from "@/lib/ca/linhas";
 import { listSellers } from "@/lib/data";
-import {
-  COLEGIO_PRODUCT_IDS,
-  CPPEM_PRODUCT_IDS,
-  UNICIVE_PRODUCT_IDS,
-} from "@/lib/products";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-const LINHAS = new Set<string>([...CPPEM_PRODUCT_IDS, ...UNICIVE_PRODUCT_IDS, ...COLEGIO_PRODUCT_IDS]);
 
 /**
  * Aplica TODAS as sugestoes de uma vez.
@@ -64,7 +58,7 @@ export async function POST() {
     }
     // Linha invalida nunca entra: buFromProductLine manda desconhecido para o
     // CPPEM sem erro, e viraria faturamento da BU errada em silencio.
-    const linha = p.product_line && LINHAS.has(p.product_line) ? p.product_line : null;
+    const linha = p.product_line && LINHAS_VENDEDOR.has(p.product_line) ? p.product_line : null;
     const { error } = await supabaseAdmin.from("ca_mapa_receita").upsert(
       {
         ca_tipo: "categoria",
@@ -82,13 +76,30 @@ export async function POST() {
     categorias++;
   }
 
-  // ---- itens relevantes, pela categoria dominante do historico -----------
+  // ---- itens relevantes --------------------------------------------------
+  /**
+   * Duas fontes de palpite, nesta ordem:
+   *
+   *  1. o NOME do item, quando ele e taxonomia de verdade — e o caso do
+   *     Colegio, onde a serie ("9o Ano Ensino Fundamental") so existe ali e
+   *     nenhuma votacao por categoria pode descobri-la;
+   *  2. a categoria DOMINANTE no historico do item, que resolve o resto.
+   *
+   * O nome vem primeiro porque, quando ele casa, ele e mais especifico: diz a
+   * serie e diz se e matricula ou mensalidade. Medido em 11/11/2026: as
+   * categorias 1.7 e 1.8 estao trocadas em 9 vendas, e o nome do item acerta
+   * todas as 9.
+   */
   const nomeCat = new Map(mapa.categorias.map((c) => [c.ca_id, c.ca_nome]));
   for (const i of mapa.itens) {
-    if (!i.relevante || i.product_line || i.ignorar || !i.sugestao) continue;
-    const p = palpitarCategoria(nomeCat.get(i.sugestao.categoriaCaId) ?? i.sugestao.nome);
+    if (!i.relevante || i.product_line || i.ignorar) continue;
+    const p =
+      palpitarItem(i.ca_nome) ??
+      (i.sugestao ? palpitarCategoria(nomeCat.get(i.sugestao.categoriaCaId) ?? i.sugestao.nome) : null);
     if (!p) continue;
-    const linha = p.product_line && LINHAS.has(p.product_line) ? p.product_line : null;
+    // Linha de receita do grupo (mensalidade, evento do Colegio) e valida aqui
+    // e invalida em `sales` — quem garante isso e `linhaValida`.
+    const linha = linhaValida(p.product_line, p.conta_vendedor) ? p.product_line : null;
     if (!linha && !p.ignorar) {
       semSugestao.push(i.ca_nome ?? i.ca_id);
       continue;
