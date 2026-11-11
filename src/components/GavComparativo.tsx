@@ -15,6 +15,8 @@
  * E a cor não carrega o recado sozinha: toda linha traz o valor com sinal e o
  * percentual escritos, porque a diferença é o dado, não a decoração.
  */
+import Link from "next/link";
+
 import { COLOR } from "@/lib/brand";
 import type { Comparacao, LinhaComparacao } from "@/lib/gav";
 
@@ -43,7 +45,8 @@ const BU_NOME: Record<string, string> = {
 };
 
 export default function GavComparativo({ dados }: { dados: Comparacao }) {
-  const { total, porVendedor, porBu, semColunaOrigem } = dados;
+  const { total, porVendedor, porBu, semColunaOrigem, pendencias } = dados;
+  const totalPendente = pendencias.categorias + pendencias.itens + pendencias.vendedores;
 
   return (
     <section className="panel mb-4 overflow-hidden p-4">
@@ -64,6 +67,26 @@ export default function GavComparativo({ dados }: { dados: Comparacao }) {
           linhas com <code>origem = &apos;conta_azul&apos;</code>? Enquanto uma das duas faltar, o
           painel abaixo fica vazio — e isso é o esperado, não defeito da tela.
         </p>
+      ) : null}
+
+      {/*
+        Pendência fica AQUI, no painel, e não só na aba de Classificação.
+        Vendedor novo cadastrado no Conta Azul aparece neste aviso no dia
+        seguinte; sem ele, dependeria de alguém lembrar de abrir a outra tela, e
+        a venda dessa pessoa ficaria sem dono em silêncio.
+      */}
+      {totalPendente > 0 ? (
+        <Link
+          href="/admin/gav/mapa"
+          className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 text-xs transition-opacity hover:opacity-80"
+          style={{ background: `${COLOR.warning}1a`, color: COLOR.warning }}
+        >
+          <strong>Esperando classificação:</strong>
+          {pendencias.categorias > 0 ? <span>{pendencias.categorias} categorias</span> : null}
+          {pendencias.itens > 0 ? <span>· {pendencias.itens} itens</span> : null}
+          {pendencias.vendedores > 0 ? <span>· {pendencias.vendedores} vendedores</span> : null}
+          <span className="opacity-70">— enquanto isso, essa receita não entra em lugar nenhum.</span>
+        </Link>
       ) : null}
 
       {/* O total, grande. É a primeira pergunta: fechou? */}

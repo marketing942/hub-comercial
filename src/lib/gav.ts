@@ -20,6 +20,7 @@
  * vez por requisição — não é o dobro do trabalho de uma tela, é o trabalho de
  * duas telas, que é o que de fato se está comparando.
  */
+import { supabaseAdmin } from "./supabase";
 import { statsForAll } from "./data";
 import type { SellerStats } from "./calc";
 import type { Fonte } from "./fonte";
@@ -45,6 +46,12 @@ export type Comparacao = {
   porBu: LinhaComparacao[];
   /** A migração `ca-01-origem.sql` ainda não rodou — ver `loadMonthSales`. */
   semColunaOrigem: boolean;
+  /**
+   * O que está esperando alguém. Fica no painel, e não só na aba de
+   * Classificação: vendedor novo no Conta Azul aparece aqui no dia seguinte,
+   * em vez de depender de alguém lembrar de abrir a outra tela.
+   */
+  pendencias: { categorias: number; itens: number; vendedores: number };
 };
 
 const variacao = (manual: number, ca: number): number | null =>
@@ -55,9 +62,10 @@ function linha(chave: string, rotulo: string, bu: SellerStats["bu"] | null, manu
 }
 
 export async function compararFontes(year: number, month: number): Promise<Comparacao> {
-  const [manual, ca] = await Promise.all([
+  const [manual, ca, pendencias] = await Promise.all([
     statsForAll({ year, month, fonte: FONTE_PADRAO }),
     statsForAll({ year, month, fonte: "conta_azul" satisfies Fonte }),
+    contarPendencias(),
   ]);
 
   /**
@@ -111,5 +119,68 @@ export async function compararFontes(year: number, month: number): Promise<Compa
     porVendedor,
     porBu,
     semColunaOrigem,
+    pendencias,
   };
+}
+
+/**
+ * Quantos itens esperam classificação.
+ *
+ * Item só conta como pendente quando aparece em venda SEM categoria: nos
+ * demais a categoria já resolve a linha, e classificá-los não muda nada. Um
+ * contador que não se pode zerar deixa de ser tarefa e vira ruído.
+ */
+async function contarPendencias(): Promise<{ categorias: number; itens: number; vendedores: number }> {
+  const n = async (tabela: string, aplicar: (q: ReturnType<typeof supabaseAdmin.from>) => unknown) => {
+    const q = supabaseAdmin.from(tabela).select("*", { count: "exact", head: true });
+    const { count } = (await (aplicar(q as never) as Promise<{ count: number | null }>)) ?? { count: 0 };
+    return count ?? 0;
+  };
+
+  const [categorias, vendedores] = await Promise.all([
+    n("ca_mapa_receita", (q) => (q as never as typeof q & { eq: Function }).eq("ca_tipo", "categoria").is("product_line", null).eq("ignorar", false)),
+    n("ca_vendedores", (q) => (q as never as typeof q & { eq: Function }).eq("destino", "pendente")),
+  ]);
+
+  // Itens relevantes: os que vieram em venda sem categoria e seguem sem linha.
+  const semCategoria = new Set<string>();
+  for (let f = 0; ; f += 1000) {
+    const { data } = await supabaseAdmin
+      .from("ca_vendas")
+      .select("ca_id")
+      .is("categoria_ca_id", null)
+      .order("ca_id")
+      .range(f, f + 999);
+    for (const v of data ?? []) semCategoria.add(v.ca_id as string);
+    if ((data ?? []).length < 1000) break;
+  }
+  const alvo = new Set<string>();
+  if (semCategoria.size) {
+    for (let f = 0; ; f += 1000) {
+      const { data } = await supabaseAdmin
+        .from("ca_venda_itens")
+        .select("item_ca_id, venda_ca_id")
+        .order("ca_id")
+        .range(f, f + 999);
+      for (const i of data ?? []) {
+        const id = i.item_ca_id as string | null;
+        if (id && semCategoria.has(i.venda_ca_id as string)) alvo.add(id);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
+  }
+  let itens = 0;
+  if (alvo.size) {
+    const ids = [...alvo];
+    for (let i = 0; i < ids.length; i += 300) {
+      const { data } = await supabaseAdmin
+        .from("ca_mapa_receita")
+        .select("ca_id, product_line, ignorar")
+        .eq("ca_tipo", "item")
+        .in("ca_id", ids.slice(i, i + 300));
+      itens += (data ?? []).filter((r) => !r.product_line && !r.ignorar).length;
+    }
+  }
+
+  return { categorias, itens, vendedores };
 }

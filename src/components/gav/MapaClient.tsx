@@ -24,6 +24,7 @@ import { Check, Sparkles } from "lucide-react";
 
 import { COLOR } from "@/lib/brand";
 import type { LinhaMapa, VendedorMapa } from "@/lib/ca/mapa";
+import { palpitarCategoria, palpitarVendedor } from "@/lib/ca/sugestao";
 import {
   PRODUCT_LINES_COLEGIO,
   PRODUCT_LINES_CPPEM,
@@ -40,27 +41,7 @@ const LINHAS_POR_BU: Record<string, readonly { id: string; label: string }[]> = 
 
 const BU_NOME: Record<string, string> = { cppem: "CPPEM", unicive: "UNICIVE", colegio_cppem: "Colégio" };
 
-/**
- * Palpite de BU e de "conta para vendedor" a partir do NOME da categoria.
- *
- * As categorias do Conta Azul são uma lista curta e controlada pela
- * contabilidade ("1.5 - MATRÍCULA UNICIVE", "1.8 - MENSALIDADE COLÉGIO"), não
- * nomes livres de produto. Por isso aqui ler o texto é seguro — e isto é um
- * PRÉ-PREENCHIMENTO de formulário, confirmado por gente, não uma regra que roda
- * sozinha em produção. A distinção é a mesma de sempre: sugerir sim, decidir não.
- */
-function palpite(nome: string | null): { bu: string; conta: boolean } | null {
-  if (!nome) return null;
-  const n = nome
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  const bu = n.includes("UNICIVE") ? "unicive" : n.includes("COLEGIO") ? "colegio_cppem" : n.includes("CPPEM") ? "cppem" : "";
-  if (!bu) return null;
-  // Recorrente e acessório não são esforço de venda; matrícula e curso são.
-  const foraDoVendedor = /MENSALIDADE|REPASSE|FARDAMENTO|LIVRO|FRETE|MULTA|RENDIMENTO|EMPRESTIMO/.test(n);
-  return { bu, conta: !foraDoVendedor };
-}
+
 
 export default function MapaClient({
   categorias,
@@ -198,11 +179,13 @@ function TabelaLinhas({ linhas, tipo }: { linhas: LinhaMapa[]; tipo: "categoria"
 function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
   const router = useRouter();
   const [salvando, startTransition] = useTransition();
-  const sug = linha.product_line || linha.ignorar ? null : palpite(linha.ca_nome);
+  // Só sugere o que ainda não foi classificado — palpite nunca sobrescreve gente.
+  const jaFeito = !!linha.product_line || linha.ignorar;
+  const sug = jaFeito || linha.ca_tipo !== "categoria" ? null : palpitarCategoria(linha.ca_nome);
   const [bu, setBu] = useState(linha.bu ?? sug?.bu ?? "");
-  const [pl, setPl] = useState(linha.product_line ?? "");
-  const [conta, setConta] = useState(linha.conta_vendedor || (sug?.conta ?? false));
-  const [ignorar, setIgnorar] = useState(linha.ignorar);
+  const [pl, setPl] = useState(linha.product_line ?? sug?.product_line ?? "");
+  const [conta, setConta] = useState(linha.conta_vendedor || (sug?.conta_vendedor ?? false));
+  const [ignorar, setIgnorar] = useState(linha.ignorar || (sug?.ignorar ?? false));
   const [erro, setErro] = useState<string | null>(null);
 
   const pendente = !linha.product_line && !linha.ignorar;
@@ -245,7 +228,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
         {sug ? (
           <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
             <Sparkles className="h-3 w-3" />
-            sugerido pelo nome: {BU_NOME[sug.bu]} · {sug.conta ? "conta p/ vendedor" : "não conta"}
+            sugerido: {sug.porque}
           </p>
         ) : null}
         {linha.sugestao ? (
@@ -356,8 +339,10 @@ function TabelaVendedores({ vendedores, sellers }: { vendedores: VendedorMapa[];
 function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: string; name: string; bu: string }[] }) {
   const router = useRouter();
   const [salvando, startTransition] = useTransition();
-  const [destino, setDestino] = useState(v.destino);
-  const [sellerId, setSellerId] = useState(v.seller_id ?? "");
+  // Palpite só enquanto está pendente — nunca sobrescreve o que já foi decidido.
+  const sug = v.destino === "pendente" ? palpitarVendedor(v.ca_nome, sellers) : null;
+  const [destino, setDestino] = useState(sug?.destino ?? v.destino);
+  const [sellerId, setSellerId] = useState(v.seller_id ?? sug?.sellerId ?? "");
   const [erro, setErro] = useState<string | null>(null);
 
   async function salvar() {
@@ -380,6 +365,12 @@ function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: stri
       <td className="py-2 pr-3 align-top">
         <p className={v.destino === "pendente" ? "font-medium" : "text-white/60"}>{v.ca_nome || v.ca_vendedor_id}</p>
         <p className="text-[11px] text-white/25">{v.ca_vendedor_id.slice(0, 8)}</p>
+        {sug ? (
+          <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
+            <Sparkles className="h-3 w-3" />
+            sugerido: {sug.porque}
+          </p>
+        ) : null}
         {erro ? (
           <p className="mt-0.5 text-[11px]" style={{ color: COLOR.danger }}>
             {erro}
