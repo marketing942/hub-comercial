@@ -117,7 +117,7 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 
 ## 7. Pendências de identidade (não bloqueiam)
 
-- `src/app/icon.svg`: troféu dourado correto, mas as alças ainda estão em lima `#a3e635` (resquício do tema antigo).
+- `src/app/icon.svg`: favicon = cifrão dourado (gradiente `#f0dcb0→#c9ae7a→#af9256`) sobre fundo carvão.
 - `avatar_color` padrão `#22c55e` em `src/app/api/sellers/route.ts` (e default da coluna no `schema.sql`).
 
 ## 8. Fluxo de trabalho neste repositório
