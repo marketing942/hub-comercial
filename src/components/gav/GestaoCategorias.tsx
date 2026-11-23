@@ -1,20 +1,19 @@
-import { BU_LABEL, COLOR } from "@/lib/brand";
+import { COLOR } from "@/lib/brand";
 import { BRL, fmtPct } from "@/lib/calc";
-import type { GestaoMes, LinhaCategoria } from "@/lib/gestaoAVistaTipos";
+import { BU_GESTAO_ROTULO, BUS_GESTAO, type GestaoMes } from "@/lib/gestaoAVistaTipos";
 import ProgressBar from "@/components/ProgressBar";
 
-const ORDEM: (LinhaCategoria["bu"])[] = ["cppem", "unicive", "colegio_cppem", "grupo"];
-const ROTULO_GRUPO = "Outras receitas do grupo";
 
 /**
  * Receita por categoria — TODAS as linhas de receita do Conta Azul no mes, as
  * dos vendedores e as que existem so no grupo (mensalidade, repasse...),
- * agrupadas por BU, com o subtotal de cada uma. A barra mostra a fatia do
- * faturamento total da empresa.
+ * agrupadas por BU, com o subtotal de cada uma. As 12 series do Colegio sao uma
+ * categoria so (Matriculas do Colegio). "Sem classificacao" e receita do Conta
+ * Azul que ainda nao tem linha. A barra e a fatia do faturamento total.
  */
 export default function GestaoCategorias({ dados }: { dados: GestaoMes }) {
   const { categorias, total } = dados;
-  const grupos = ORDEM.map((bu) => {
+  const grupos = BUS_GESTAO.map((bu) => {
     const linhas = categorias.filter((c) => c.bu === bu).sort((a, b) => b.valor - a.valor);
     return { bu, linhas, subtotal: linhas.reduce((s, c) => s + c.valor, 0) };
   }).filter((g) => g.linhas.length > 0);
@@ -42,7 +41,7 @@ export default function GestaoCategorias({ dados }: { dados: GestaoMes }) {
             <div key={g.bu}>
               <div className="flex items-baseline justify-between border-b border-[var(--hair)] pb-1.5">
                 <span className="font-ui text-[12px] font-bold uppercase tracking-[0.14em] text-accent">
-                  {g.bu === "grupo" ? ROTULO_GRUPO : BU_LABEL[g.bu]}
+                  {BU_GESTAO_ROTULO[g.bu]}
                 </span>
                 <span className="text-sm font-semibold tabular-nums">
                   {BRL.format(g.subtotal)}
@@ -58,7 +57,7 @@ export default function GestaoCategorias({ dados }: { dados: GestaoMes }) {
                     <li key={c.chave} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto]">
                       <span className="truncate text-sm text-white/85">{c.rotulo}</span>
                       <span className="order-3 col-span-2 sm:order-none sm:col-span-1">
-                        <ProgressBar value={pct} color={COLOR.gold} height={6} />
+                        <ProgressBar value={pct} color={g.bu === "pendente" ? COLOR.warning : COLOR.gold} height={6} />
                       </span>
                       <span className="text-right text-sm font-semibold tabular-nums">
                         {BRL.format(c.valor)}

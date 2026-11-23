@@ -10,20 +10,19 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gauge, ShoppingCart } from "lucide-react";
+import { Gauge } from "lucide-react";
 
 const TABS = [
   // "Conexao e sync" saiu do menu em 2026-11-23: com o Jarvis empurrando o
   // espelho a cada 15 min, nao ha mais o que disparar a mao no dia a dia. A
   // rota continua de pe e a pagina de Vendas linka para ela no rodape.
-  { href: "/admin/gav/vendas", label: "Vendas", icon: <ShoppingCart className="w-3.5 h-3.5" /> },
   { href: "/admin/gav/gestao", label: "Gestão à Vista", icon: <Gauge className="w-3.5 h-3.5" /> },
 ];
 
 export default function GavSubnav() {
   const pathname = usePathname();
   return (
-    <div className="sticky top-14 z-20 -mx-4 border-b border-border bg-bg/85 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
+    <div className="gav-subnav sticky top-14 z-20 -mx-4 border-b border-border bg-bg/85 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
       <div className="flex items-center gap-2">
         <div className="mr-1 hidden text-[11px] uppercase tracking-wider text-white/40 sm:block">GAV</div>
         <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-xl border border-border bg-panel p-1 sm:inline-flex">

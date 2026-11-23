@@ -23,6 +23,7 @@ import { useState, useTransition } from "react";
 import { Check, Sparkles, Wand2 } from "lucide-react";
 
 import { COLOR } from "@/lib/brand";
+import { LINHAS_GRUPO, ROTULOS_GRUPO } from "@/lib/ca/linhas";
 import type { LinhaMapa, VendedorMapa } from "@/lib/ca/mapa";
 import { palpitarCategoria, palpitarVendedor } from "@/lib/ca/sugestao";
 import {
@@ -33,10 +34,27 @@ import {
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+/**
+ * Linhas de receita que existem SÓ no grupo (não contam para vendedor), por BU.
+ *
+ * Estavam fora desta lista, então só dava para chegar nelas pela sugestão
+ * automática: "Repasse de mensalidade" da Unicive, mensalidade, evento, reforço e
+ * livros do Colégio nunca podiam ser escolhidos à mão — e o que ficava sem
+ * sugestão sumia da Gestão à Vista. Valem com "Conta para o vendedor" DESMARCADO.
+ */
+const LINHAS_GRUPO_POR_BU: Record<string, readonly { id: string; label: string }[]> = {
+  cppem: [],
+  unicive: [{ id: "repasse_unicive", label: `${ROTULOS_GRUPO.repasse_unicive} (grupo)` }],
+  colegio_cppem: ["mensalidade_colegio", "eventos_colegio", "reforco_colegio", "livros_colegio"].map((id) => ({
+    id,
+    label: `${ROTULOS_GRUPO[id]} (grupo)`,
+  })),
+};
+
 const LINHAS_POR_BU: Record<string, readonly { id: string; label: string }[]> = {
-  cppem: PRODUCT_LINES_CPPEM,
-  unicive: PRODUCT_LINES_UNICIVE,
-  colegio_cppem: PRODUCT_LINES_COLEGIO,
+  cppem: [...PRODUCT_LINES_CPPEM, ...LINHAS_GRUPO_POR_BU.cppem],
+  unicive: [...PRODUCT_LINES_UNICIVE, ...LINHAS_GRUPO_POR_BU.unicive],
+  colegio_cppem: [...PRODUCT_LINES_COLEGIO, ...LINHAS_GRUPO_POR_BU.colegio_cppem],
 };
 
 const BU_NOME: Record<string, string> = { cppem: "CPPEM", unicive: "UNICIVE", colegio_cppem: "Colégio" };
@@ -333,7 +351,16 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
         </select>
       </td>
       <td className="py-2 pr-3 align-top">
-        <select className="input !py-1 text-xs" value={pl} onChange={(e) => setPl(e.target.value)} disabled={ignorar || !bu}>
+        <select
+          className="input !py-1 text-xs"
+          value={pl}
+          onChange={(e) => {
+            setPl(e.target.value);
+            // Linha só-do-grupo não pode contar para vendedor (o Reprocessar a descartaria).
+            if (LINHAS_GRUPO.has(e.target.value)) setConta(false);
+          }}
+          disabled={ignorar || !bu}
+        >
           <option value="">—</option>
           {opcoes.map((o) => (
             <option key={o.id} value={o.id}>
@@ -347,7 +374,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
           type="checkbox"
           checked={conta}
           onChange={(e) => setConta(e.target.checked)}
-          disabled={ignorar}
+          disabled={ignorar || LINHAS_GRUPO.has(pl)}
           aria-label="Conta para o vendedor"
         />
       </td>

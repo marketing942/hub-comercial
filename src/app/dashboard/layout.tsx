@@ -14,7 +14,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const items: SidebarItem[] = isAdmin
     ? [
         { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
-        // GAV: so admin. Hoje tem a aba Vendas (mes a mes e vendas do mes do Conta Azul).
+        // GAV: so admin. Hoje tem a Gestao a Vista (faturamento da empresa).
         { href: "/admin/gav", label: "GAV", icon: "chart" },
         {
           href: "/admin/sellers",

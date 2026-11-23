@@ -15,8 +15,19 @@
  * Somando as tres sai o faturamento total da empresa. A soma e feita aqui, nao
  * nas telas: dali para dentro `valor` quer dizer uma coisa so (total da linha).
  *
- * Item ainda sem classificacao NAO esta em nenhuma das tres (ver
- * "Classificacao" em Configuracoes) — a tela avisa no rodape.
+ * ## Nada do Conta Azul fica de fora
+ *
+ * Item que o Conta Azul tem e que ainda nao foi classificado (ver "Classificacao"
+ * em Configuracoes) nao esta em nenhuma das tres tabelas. Mesmo assim e receita
+ * da empresa, entao entra aqui como `pendente` ("Sem classificacao"), com a
+ * categoria do Conta Azul no nome — o total da empresa fecha com o do Conta Azul
+ * e o que falta classificar fica visivel, nunca invisivel. So fica de fora o que
+ * foi marcado "ignorar" (frete, multa, estorno) e venda cancelada.
+ *
+ * ## Categoria de receita
+ *
+ * As 12 series do Colegio sao UMA categoria aqui ("Matriculas do Colegio"): a
+ * serie serve para meta e dashboard por turma, nao para ler o faturamento.
  *
  * Todas as leituras filtram `origem = 'conta_azul'`: lancamento a mao antigo
  * nao entra, e a tela nao depende de `FONTE_PADRAO`.
@@ -25,15 +36,100 @@ import { unstable_cache } from "next/cache";
 
 import { DASHBOARD_TAG, supabaseAdmin } from "./supabase";
 import { fetchAll } from "./data";
-import { ROTULOS_GRUPO, LINHAS_VENDEDOR } from "./ca/linhas";
-import { buFromProductLine, productLabel, type BU } from "./products";
+import { situacaoConta } from "./ca/config";
+import { lerPorChaves, lerTudo } from "./ca/ler";
+import { LINHAS_VENDEDOR, ROTULOS_GRUPO } from "./ca/linhas";
+import { COLEGIO_MATRICULAS_IDS, buFromProductLine, productLabel } from "./products";
 import { nowRecife } from "./calc";
-import type { DiaGestao, GestaoMes, LinhaCategoria, Origem } from "./gestaoAVistaTipos";
+import {
+  vazioBu,
+  vazioOrigem,
+  type BuKey,
+  type DiaGestao,
+  type GestaoMes,
+  type LinhaCategoria,
+  type Origem,
+} from "./gestaoAVistaTipos";
 
 type Linha = { sale_date: string; product_line: string; valor: number | null };
 type LinhaGrupo = Linha & { bu: string | null; conta_vendedor: boolean | null };
 
+const MATRICULAS_COLEGIO = new Set<string>(COLEGIO_MATRICULAS_IDS as readonly string[]);
+/** BU das linhas so-do-grupo, para quando a linha gravada veio sem BU. */
+const BU_DO_GRUPO: Record<string, BuKey> = {
+  repasse_unicive: "unicive",
+  mensalidade_colegio: "colegio_cppem",
+  eventos_colegio: "colegio_cppem",
+  reforco_colegio: "colegio_cppem",
+  livros_colegio: "colegio_cppem",
+};
 const BUS_VALIDAS = new Set<string>(["cppem", "unicive", "colegio_cppem"]);
+
+/** Linha de receita -> categoria de receita exibida (as series do Colegio viram uma). */
+function categoriaDe(linha: string): { chave: string; rotulo: string } {
+  if (MATRICULAS_COLEGIO.has(linha)) return { chave: "colegio_matriculas", rotulo: "Matrículas do Colégio" };
+  return { chave: linha, rotulo: ROTULOS_GRUPO[linha] ?? productLabel(linha) };
+}
+
+function buDaLinha(linha: string, buGravada: string | null): BuKey {
+  if (LINHAS_VENDEDOR.has(linha)) return buFromProductLine(linha);
+  if (buGravada && BUS_VALIDAS.has(buGravada)) return buGravada as BuKey;
+  return BU_DO_GRUPO[linha] ?? "grupo";
+}
+
+type Pendente = { data: string; valor: number; categoria: string };
+
+/**
+ * Itens do Conta Azul do mes que contam como faturamento mas ainda nao tem linha
+ * de receita. Mesma precedencia da normalizacao (item antes de categoria, ver
+ * `src/lib/ca/normaliza.ts`) — so que aqui o resultado e "tem linha ou nao".
+ */
+async function lerPendentes(de: string, prox: string): Promise<Pendente[]> {
+  const vendasRaw = await lerTudo<{ ca_id: string; data: string; situacao: string | null; categoria_ca_id: string | null }>(
+    "ca_vendas",
+    "ca_id, data, situacao, categoria_ca_id",
+    { filtrar: (q) => (q as never as { gte: Function; lt: Function }).gte("data", de).lt("data", prox) },
+  );
+  const vendas = vendasRaw.filter((v) => situacaoConta(v.situacao));
+  if (vendas.length === 0) return [];
+
+  const [itens, mapaRaw] = await Promise.all([
+    lerPorChaves<{ venda_ca_id: string; item_ca_id: string | null; quantidade: number | null; valor: number | null }>(
+      "ca_venda_itens",
+      "ca_id, venda_ca_id, item_ca_id, quantidade, valor",
+      "venda_ca_id",
+      vendas.map((v) => v.ca_id),
+    ),
+    lerTudo<{ ca_tipo: string; ca_id: string; ca_nome: string | null; product_line: string | null; ignorar: boolean | null }>(
+      "ca_mapa_receita",
+      "ca_tipo, ca_id, ca_nome, product_line, ignorar",
+      { ordenarPor: "ca_id" },
+    ),
+  ]);
+
+  const mapaItem = new Map<string, (typeof mapaRaw)[number]>();
+  const mapaCat = new Map<string, (typeof mapaRaw)[number]>();
+  for (const m of mapaRaw) (m.ca_tipo === "item" ? mapaItem : mapaCat).set(m.ca_id, m);
+  const vendaPorId = new Map(vendas.map((v) => [v.ca_id, v]));
+
+  const out: Pendente[] = [];
+  for (const it of itens) {
+    const v = vendaPorId.get(it.venda_ca_id);
+    if (!v) continue;
+    const itMapa = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
+    const catMapa = v.categoria_ca_id ? mapaCat.get(v.categoria_ca_id) : undefined;
+    const escolhido = itMapa && !itMapa.ignorar && itMapa.product_line ? itMapa : itMapa?.ignorar ? itMapa : catMapa;
+    if (escolhido?.ignorar) continue;
+    if (escolhido?.product_line) continue; // classificado: ja esta em sales/direct_sales/ca_receita
+    const qtd = Math.max(1, Math.round(Number(it.quantidade ?? 1)));
+    out.push({
+      data: v.data,
+      valor: Number(it.valor ?? 0) * qtd,
+      categoria: catMapa?.ca_nome || (v.categoria_ca_id ? "categoria sem nome" : "sem categoria no Conta Azul"),
+    });
+  }
+  return out;
+}
 
 async function calcular(year: number, mes: number): Promise<GestaoMes> {
   const mm = String(mes).padStart(2, "0");
@@ -41,7 +137,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
   const prox = mes === 12 ? `${year + 1}-01-01` : `${year}-${String(mes + 1).padStart(2, "0")}-01`;
   const totalDias = new Date(year, mes, 0).getDate();
 
-  const [vendedores, direto, grupo, sync] = await Promise.all([
+  const [vendedores, direto, grupo, pendentes, sync] = await Promise.all([
     fetchAll<Linha>("gestao(sales)", () =>
       supabaseAdmin
         .from("sales")
@@ -69,6 +165,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
         .order("ca_venda_id")
         .order("ca_item_id"),
     ),
+    lerPendentes(de, prox).catch(() => [] as Pendente[]),
     (async () => {
       try {
         const { data } = await supabaseAdmin
@@ -86,54 +183,44 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
   const dias: DiaGestao[] = Array.from({ length: totalDias }, (_, i) => ({
     dia: i + 1,
     data: `${year}-${mm}-${String(i + 1).padStart(2, "0")}`,
-    vendedores: 0,
-    direto: 0,
-    diretoria: 0,
     total: 0,
+    origem: vazioOrigem(),
+    bu: vazioBu(),
+    categoria: {},
     acumulado: null,
   }));
-  const porOrigem: Record<Origem, number> = { vendedores: 0, direto: 0, diretoria: 0 };
+  const porOrigem = vazioOrigem();
   let semDono = 0;
   const cats = new Map<string, LinhaCategoria>();
 
-  const somar = (origem: Origem, l: Linha, buDaLinha: string | null) => {
-    const v = Number(l.valor ?? 0);
-    const d = Number(l.sale_date.slice(8, 10));
+  const somar = (origem: Origem, data: string, bu: BuKey, cat: { chave: string; rotulo: string }, valor: number) => {
+    const d = Number(data.slice(8, 10));
     if (d >= 1 && d <= totalDias) {
-      dias[d - 1][origem] += v;
-      dias[d - 1].total += v;
+      const dia = dias[d - 1];
+      dia.total += valor;
+      dia.origem[origem] += valor;
+      dia.bu[bu] += valor;
+      dia.categoria[cat.chave] = (dia.categoria[cat.chave] ?? 0) + valor;
     }
-    porOrigem[origem] += v;
-
-    const chave = l.product_line;
-    let c = cats.get(chave);
+    porOrigem[origem] += valor;
+    let c = cats.get(cat.chave);
     if (!c) {
-      // Linha de vendedor tem BU pela propria linha; as so-do-grupo, pela BU gravada.
-      const bu: BU | "grupo" = LINHAS_VENDEDOR.has(chave)
-        ? buFromProductLine(chave)
-        : buDaLinha && BUS_VALIDAS.has(buDaLinha)
-          ? (buDaLinha as BU)
-          : "grupo";
-      c = {
-        chave,
-        rotulo: ROTULOS_GRUPO[chave] ?? productLabel(chave),
-        bu,
-        valor: 0,
-        vendedores: 0,
-        direto: 0,
-        diretoria: 0,
-      };
-      cats.set(chave, c);
+      c = { chave: cat.chave, rotulo: cat.rotulo, bu, valor: 0, origem: vazioOrigem() };
+      cats.set(cat.chave, c);
     }
-    c.valor += v;
-    c[origem] += v;
+    c.valor += valor;
+    c.origem[origem] += valor;
   };
 
-  for (const l of vendedores) somar("vendedores", l, null);
-  for (const l of direto) somar("direto", l, null);
+  for (const l of vendedores) somar("vendedores", l.sale_date, buDaLinha(l.product_line, null), categoriaDe(l.product_line), Number(l.valor ?? 0));
+  for (const l of direto) somar("direto", l.sale_date, buDaLinha(l.product_line, null), categoriaDe(l.product_line), Number(l.valor ?? 0));
   for (const l of grupo) {
-    somar("diretoria", l, l.bu);
-    if (l.conta_vendedor) semDono += Number(l.valor ?? 0);
+    const v = Number(l.valor ?? 0);
+    somar("diretoria", l.sale_date, buDaLinha(l.product_line, l.bu), categoriaDe(l.product_line), v);
+    if (l.conta_vendedor) semDono += v;
+  }
+  for (const p of pendentes) {
+    somar("pendente", p.data, "pendente", { chave: `pend:${p.categoria}`, rotulo: p.categoria }, p.valor);
   }
 
   // Acumulado: para no dia de hoje se o mes e o corrente (dia futuro nao tem dado).
@@ -149,7 +236,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
   return {
     year,
     mes,
-    total: porOrigem.vendedores + porOrigem.direto + porOrigem.diretoria,
+    total: ORIGENS_SOMA.reduce((s, o) => s + porOrigem[o], 0),
     porOrigem,
     semDono,
     dias,
@@ -157,6 +244,8 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
     sync: { em: sync?.concluido_em ?? null, erro: sync?.erro ?? null },
   };
 }
+
+const ORIGENS_SOMA: Origem[] = ["vendedores", "direto", "diretoria", "pendente"];
 
 /**
  * Com cache de servidor: o mes corrente recebe venda a cada sync (15 min) e cai
@@ -168,7 +257,7 @@ export function gestaoDoMes(year: number, mes: number): Promise<GestaoMes> {
   const ehCorrente = year > hoje.getFullYear() || (year === hoje.getFullYear() && mes >= hoje.getMonth() + 1);
   return unstable_cache(
     () => calcular(year, mes),
-    [`gestao-a-vista-v1-${year}-${mes}`],
+    [`gestao-a-vista-v2-${year}-${mes}`],
     ehCorrente ? { revalidate: 600, tags: [DASHBOARD_TAG] } : { revalidate: 3600 },
   )();
 }

@@ -2,7 +2,9 @@ import Link from "next/link";
 
 import Cell from "@/components/StatCell";
 import GestaoCategorias from "@/components/gav/GestaoCategorias";
-import GestaoDiaria from "@/components/gav/GestaoDiariaLazy";
+import BotaoTelaCheia from "@/components/gav/BotaoTelaCheia";
+import GestaoGrafico from "@/components/gav/GestaoGraficoLazy";
+import { COLOR } from "@/lib/brand";
 import { BRL, fmtPct, periodNow } from "@/lib/calc";
 import { gestaoDoMes } from "@/lib/gestaoAVista";
 import { COR_ORIGEM, ORIGEM_ROTULO, type Origem } from "@/lib/gestaoAVistaTipos";
@@ -31,6 +33,7 @@ export default async function GestaoPage({
   for (let a = agora.year; a >= Math.max(YEAR_MIN, agora.year - 3); a--) anos.push(a);
 
   const origens: Origem[] = ["vendedores", "direto", "diretoria"];
+  const pendente = dados.porOrigem.pendente;
   const pct = (v: number) => (dados.total > 0 ? fmtPct((v / dados.total) * 100) : "—");
 
   return (
@@ -43,6 +46,7 @@ export default async function GestaoPage({
           </p>
         </div>
         <div className="flex items-center gap-1">
+          <BotaoTelaCheia />
           {anos.map((a) => (
             <Link
               key={a}
@@ -81,6 +85,7 @@ export default async function GestaoPage({
         <div className="-ml-px -mt-px grid grid-cols-2 md:grid-cols-4">
           <Cell label={`Total ${MES_CURTO[mes - 1]}/${year}`} value={BRL.format(dados.total)}>
             Todas as linhas de receita
+            {pendente > 0 ? <> · inclui <span style={{ color: COLOR.warning }}>{BRL.format(pendente)}</span> sem classificação</> : null}
           </Cell>
           {origens.map((o) => (
             <Cell key={o} label={ORIGEM_ROTULO[o]} value={BRL.format(dados.porOrigem[o])}>
@@ -95,15 +100,7 @@ export default async function GestaoPage({
         </div>
       </section>
 
-      <section className="panel p-5">
-        <div className="mb-3">
-          <div className="eyebrow-label">Faturamento dia a dia</div>
-          <div className="mt-1 text-xs text-white/45">
-            Receita de cada dia de {MES_NOME[mes - 1]}, por origem, e o acumulado do mês.
-          </div>
-        </div>
-        <GestaoDiaria dias={dados.dias} />
-      </section>
+      <GestaoGrafico dias={dados.dias} categorias={dados.categorias} />
 
       <GestaoCategorias dados={dados} />
 
@@ -115,11 +112,14 @@ export default async function GestaoPage({
         ) : (
           <>Nunca sincronizado. </>
         )}
-        Itens ainda sem classificacao nao entram nestes numeros —{" "}
+        Receita sem classificacao aparece em laranja ate alguem classificar —{" "}
         <Link href="/admin/classificacao" className="underline hover:text-white/60">
           ver Classificacao
         </Link>
-        .
+        .{" "}
+        <Link href="/admin/gav/conexao" className="underline hover:text-white/60">
+          Conexao e sync
+        </Link>
       </p>
     </div>
   );
