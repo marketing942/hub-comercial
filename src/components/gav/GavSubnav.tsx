@@ -10,12 +10,15 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gauge, Plug, Tags } from "lucide-react";
+import { Gauge, ShoppingCart, Tags } from "lucide-react";
 
 const TABS = [
   { href: "/admin/gav", label: "Painel", icon: <Gauge className="w-3.5 h-3.5" /> },
   { href: "/admin/gav/mapa", label: "Classificacao", icon: <Tags className="w-3.5 h-3.5" /> },
-  { href: "/admin/gav/conexao", label: "Conexao e sync", icon: <Plug className="w-3.5 h-3.5" /> },
+  // "Conexao e sync" saiu do menu em 2026-11-23: com o Jarvis empurrando o
+  // espelho a cada 15 min, nao ha mais o que disparar a mao no dia a dia. A
+  // rota continua de pe e a pagina de Vendas linka para ela no rodape.
+  { href: "/admin/gav/vendas", label: "Vendas", icon: <ShoppingCart className="w-3.5 h-3.5" /> },
 ];
 
 export default function GavSubnav() {

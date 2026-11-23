@@ -21,8 +21,19 @@
  */
 export type Fonte = "manual" | "conta_azul";
 
-/** O que as telas normais leem. Trocar isto É o cutover. */
-export const FONTE_PADRAO: Fonte = "manual";
+/**
+ * O que as telas normais leem.
+ *
+ * **O cutover aconteceu em 2026-11-23.** Até aqui isto era `"manual"` e o Conta
+ * Azul vivia só no GAV; agora é o contrário — o Conta Azul é a única fonte das
+ * telas, e o lançamento à mão foi desativado (`/seller/sales` virou leitura, e
+ * `POST /api/sales` recusa).
+ *
+ * O que foi lançado à mão continua no banco, intacto, com `origem = 'manual'`:
+ * nada foi apagado. Voltar atrás é trocar esta linha de volta e reabrir o
+ * cadastro — por isso o caminho antigo não foi removido do código, só fechado.
+ */
+export const FONTE_PADRAO: Fonte = "conta_azul";
 
 export const FONTE_LABEL: Record<Fonte, string> = {
   manual: "Lançamento manual",

@@ -818,6 +818,22 @@ export async function sellerSeries(
 // =====================================================
 // Breakdown por linha de produto (mantem fluxo de bu_product_goals)
 // =====================================================
+/** Uma venda dentro de uma categoria — o detalhe que o card abre. */
+export type VendaDaCategoria = {
+  /**
+   * Chave de RENDER, não de identidade. A ponte do Conta Azul apaga e reinsere
+   * a janela a cada sync, então este `id` muda de 15 em 15 minutos. Serve de
+   * `key` do React dentro de um render e nada além disso — não guarde, não
+   * compare entre cargas.
+   */
+  id: string;
+  data: string;
+  /** Nome do vendedor, ou "Direto"/"IA" quando a venda não tem dono. */
+  vendedor: string;
+  valor: number;
+  quantidade: number;
+};
+
 export type ProductBreakdownRow = {
   product_line: string;
   label: string;
@@ -825,6 +841,14 @@ export type ProductBreakdownRow = {
   qtd: number;
   valor_meta: number;
   quantidade_meta: number;
+  /**
+   * As vendas que formaram `valor`, da mais recente para a mais antiga.
+   *
+   * OPCIONAL de propósito: os agregados por canal (Direto/IA) montam estas
+   * linhas sem detalhe, e um card que abre numa lista vazia é pior do que um
+   * card que não abre. Quem rende a tela trata ausência como "sem expansão".
+   */
+  vendas?: VendaDaCategoria[];
 };
 
 export async function productBreakdown(
@@ -850,6 +874,7 @@ export async function productBreakdown(
       qtd: 0,
       valor_meta: 0,
       quantidade_meta: 0,
+      vendas: [],
     };
   });
 
@@ -866,10 +891,18 @@ export async function productBreakdown(
       ? []
       : goals.productGoals.filter((g) => idSet.has(g.seller_id) && pidSet.has(g.product_line));
 
+  const nomePorVendedor = new Map(sellers.map((v) => [v.id, v.name]));
   for (const s of (sales as any[]) || []) {
     if (map[s.product_line]) {
       map[s.product_line].valor += Number(s.valor || 0);
       map[s.product_line].qtd += Number(s.quantidade || 0);
+      map[s.product_line].vendas!.push({
+        id: String(s.id),
+        data: s.sale_date,
+        vendedor: nomePorVendedor.get(s.seller_id) ?? "(sem vendedor)",
+        valor: Number(s.valor || 0),
+        quantidade: Number(s.quantidade || 0),
+      });
     }
   }
 
@@ -881,6 +914,14 @@ export async function productBreakdown(
       if (map[r.product_line]) {
         map[r.product_line].valor += Number(r.valor || 0);
         map[r.product_line].qtd += Number(r.quantidade || 0);
+        map[r.product_line].vendas!.push({
+          id: `direto-${r.id}`,
+          data: r.sale_date,
+          // Estas vendas não têm vendedor por desenho: o canal É o dono.
+          vendedor: r.channel === "ia" ? "IA" : "Direto",
+          valor: Number(r.valor || 0),
+          quantidade: Number(r.quantidade || 0),
+        });
       }
     }
   }
@@ -900,6 +941,74 @@ export async function productBreakdown(
         map[g.product_line].quantidade_meta += Number(g.quantidade_meta || 0);
       }
     }
+  }
+  // Mais recente primeiro; no mesmo dia, a maior venda no topo. Sem
+  // `created_at` no desempate: nas linhas do Conta Azul ele é a hora do sync.
+  for (const r of Object.values(map)) {
+    r.vendas!.sort((a, b) => (a.data === b.data ? b.valor - a.valor : a.data < b.data ? 1 : -1));
+  }
+  return Object.values(map);
+}
+
+/**
+ * O mesmo "Receita por categoria", mas só do vendedor logado.
+ *
+ * Reusa `sellerMonthRaw` — o MESMO carregamento que alimenta os números do
+ * painel dele. Se tivesse consulta própria, o detalhe por categoria poderia
+ * divergir do total mostrado acima, que é o tipo de inconsistência que faz
+ * vendedor desconfiar do painel inteiro.
+ *
+ * O canal Direto/IA não entra: não é venda de vendedor nenhum, e somá-la aqui
+ * inflaria o resultado individual.
+ */
+export async function sellerProductBreakdown(
+  seller: Seller,
+  bu: "cppem" | "unicive" | "colegio_cppem",
+  opts?: { year?: number; month?: number; fonte?: Fonte },
+): Promise<ProductBreakdownRow[]> {
+  const { year, month } = { ...periodNow(), ...opts };
+  const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
+
+  const productIds = productIdsFor(bu) as unknown as string[];
+  const pidSet = new Set(productIds);
+  const map: Record<string, ProductBreakdownRow> = {};
+  productIds.forEach((id) => {
+    map[id] = {
+      product_line: id,
+      label: productLabel(id),
+      valor: 0,
+      qtd: 0,
+      valor_meta: 0,
+      quantidade_meta: 0,
+      vendas: [],
+    };
+  });
+
+  const raw = await sellerMonthRaw(seller.id, year, month, fonte);
+
+  for (const v of raw.sales) {
+    if (!pidSet.has(v.product_line)) continue;
+    const linha = map[v.product_line];
+    linha.valor += Number(v.valor || 0);
+    linha.qtd += Number(v.quantidade || 0);
+    linha.vendas!.push({
+      id: String(v.id),
+      data: v.sale_date,
+      vendedor: seller.name,
+      valor: Number(v.valor || 0),
+      quantidade: Number(v.quantidade || 0),
+    });
+  }
+
+  for (const g of raw.productGoals) {
+    if (map[g.product_line]) {
+      map[g.product_line].valor_meta += Number(g.valor_meta || 0);
+      map[g.product_line].quantidade_meta += Number(g.quantidade_meta || 0);
+    }
+  }
+
+  for (const r of Object.values(map)) {
+    r.vendas!.sort((a, b) => (a.data === b.data ? b.valor - a.valor : a.data < b.data ? 1 : -1));
   }
   return Object.values(map);
 }

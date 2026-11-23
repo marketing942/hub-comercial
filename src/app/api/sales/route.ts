@@ -2,9 +2,36 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { todayISORecife } from "@/lib/calc";
+import { FONTE_PADRAO } from "@/lib/fonte";
 
-// POST /api/sales { sale_date, product_line, valor, quantidade, observacao? }
+/**
+ * POST /api/sales — FECHADO no cutover de 2026-11-23.
+ *
+ * O faturamento passou a vir inteiro do Conta Azul (`src/lib/fonte.ts`). Aceitar
+ * um lançamento à mão agora criaria uma venda que nenhuma tela soma — as telas
+ * leem `origem = 'conta_azul'` — e o vendedor ficaria esperando um número que
+ * nunca ia subir.
+ *
+ * A porta se fecha AQUI, no servidor, e não só escondendo o botão: a tela do
+ * vendedor é código que roda no navegador dele.
+ *
+ * O corpo antigo continua abaixo, intocado e inalcançável, de propósito — é o
+ * caminho de volta se o cutover precisar ser revertido. Reverter é soltar este
+ * bloco e trocar `FONTE_PADRAO` de volta para `"manual"`.
+ */
 export async function POST(req: Request) {
+  const s = await getSession();
+  if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
+  return NextResponse.json(
+    {
+      error:
+        "O lancamento manual de vendas foi desativado. O faturamento agora vem do Conta Azul automaticamente.",
+    },
+    { status: 410 },
+  );
+}
+
+async function POST_DESATIVADO(req: Request) {
   const s = await getSession();
   if (s?.role !== "seller" || !s.sellerId) {
     return NextResponse.json({ error: "Apenas vendedores logados." }, { status: 401 });
@@ -67,9 +94,9 @@ export async function GET(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("sales")
     .select("*")
-    // So o lancamento manual: as linhas do Conta Azul vivem exclusivamente no
-    // GAV (/admin/gav). Ver src/lib/fonte.ts.
-    .eq("origem", "manual")
+    // Acompanha a fonte das telas: depois do cutover isto e 'conta_azul'.
+    // Fixar "manual" aqui devolveria lista vazia. Ver src/lib/fonte.ts.
+    .eq("origem", FONTE_PADRAO)
     .eq("seller_id", sellerId)
     .gte("sale_date", firstDay)
     .lt("sale_date", lastDay)

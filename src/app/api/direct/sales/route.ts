@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { CPPEM_PRODUCT_IDS, UNICIVE_PRODUCT_IDS } from "@/lib/products";
 import { todayISORecife } from "@/lib/calc";
+import { FONTE_PADRAO } from "@/lib/fonte";
 
 const CPPEM_IDS = CPPEM_PRODUCT_IDS as unknown as string[];
 const UNI_IDS = UNICIVE_PRODUCT_IDS as unknown as string[];
@@ -66,9 +67,8 @@ export async function GET(req: Request) {
   const { data, error } = await supabaseAdmin
     .from("direct_sales")
     .select("*")
-    // So o lancamento manual: as linhas do Conta Azul vivem exclusivamente no
-    // GAV (/admin/gav). Ver src/lib/fonte.ts.
-    .eq("origem", "manual")
+    // Segue a fonte das telas (hoje: Conta Azul). Ver src/lib/fonte.ts.
+    .eq("origem", FONTE_PADRAO)
     .gte("sale_date", firstDay)
     .lt("sale_date", lastDay)
     .order("sale_date", { ascending: false })

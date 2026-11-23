@@ -4,8 +4,6 @@ import { BU_COLOR, BU_LABEL, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary } from "@/lib/products";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
-import ColegioTurmasBreakdown from "@/components/ColegioTurmasBreakdown";
-import UniciveCategoriasBreakdown from "@/components/UniciveCategoriasBreakdown";
 import LongTermGoalCard from "@/components/LongTermGoalCard";
 import ProgressBar from "@/components/ProgressBar";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
@@ -300,10 +298,15 @@ export default function DashboardView({
         </section>
       )}
 
-      {/* 3) Receita por categoria */}
-      {bu === "cppem" && <ProductRevenueBreakdown rows={breakdown} color={color} />}
-      {bu === "unicive" && <UniciveCategoriasBreakdown rows={breakdown} />}
-      {bu === "colegio_cppem" && <ColegioTurmasBreakdown rows={breakdown} />}
+      {/*
+        3) Receita por categoria — MESMO card nas três BUs desde 2026-11-23.
+        Antes cada BU tinha o seu (`UniciveCategoriasBreakdown`,
+        `ColegioTurmasBreakdown`), e quem trocava de BU trocava de linguagem
+        visual no meio da leitura. Os dois antigos continuam no repositório,
+        sem uso, porque o da Unicive trazia um total de matrículas no cabeçalho
+        que pode fazer falta — se fizer, ele volta como prop daqui.
+      */}
+      <ProductRevenueBreakdown rows={breakdown} />
     </div>
   );
 }

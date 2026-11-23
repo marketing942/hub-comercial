@@ -37,7 +37,10 @@ export default async function GavPage({
   if (session.role !== "admin") redirect("/dashboard");
 
   const { year, month } = parseYearMonth(searchParams);
-  const [comparacao, grupo] = await Promise.all([compararFontes(year, month), receitaDoGrupo(year, month)]);
+  const [comparacao, grupo] = await Promise.all([
+    compararFontes(year, month),
+    receitaDoGrupo(year, month),
+  ]);
 
   return (
     <PainelDashboard

@@ -27,7 +27,6 @@ import { productLabel } from "./products";
 import { buListOf, listSellers, statsForAll } from "./data";
 import type { SellerStats } from "./calc";
 import type { Fonte } from "./fonte";
-import { FONTE_PADRAO } from "./fonte";
 
 export type LinhaComparacao = {
   chave: string;
@@ -65,8 +64,22 @@ function linha(chave: string, rotulo: string, bu: SellerStats["bu"] | null, manu
 }
 
 export async function compararFontes(year: number, month: number): Promise<Comparacao> {
+  /**
+   * ⚠️ `"manual"` LITERAL, nunca `FONTE_PADRAO`.
+   *
+   * Até o cutover as duas coisas eram iguais, e usar a constante parecia mais
+   * expressivo ("o que as telas normais mostram" × "o Conta Azul"). No dia em
+   * que `FONTE_PADRAO` virou `"conta_azul"` (2026-11-23), os dois lados
+   * passaram a ler a MESMA origem e a conferência começou a exibir
+   * "+R$ 0 — 0%" para qualquer mês. O pior tipo de erro num painel de
+   * conferência: ele não quebra, ele CONCORDA, e passa a sensação de que está
+   * tudo certo justamente quando parou de verificar qualquer coisa.
+   *
+   * Esta tela compara DUAS origens nomeadas. Nenhuma das duas pode depender de
+   * qual delas as telas normais estão lendo hoje.
+   */
   const [manual, ca, pendencias] = await Promise.all([
-    statsForAll({ year, month, fonte: FONTE_PADRAO }),
+    statsForAll({ year, month, fonte: "manual" satisfies Fonte }),
     statsForAll({ year, month, fonte: "conta_azul" satisfies Fonte }),
     contarPendencias(year, month),
   ]);

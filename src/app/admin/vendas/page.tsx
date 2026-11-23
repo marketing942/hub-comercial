@@ -1,5 +1,6 @@
 import { listSellers } from "@/lib/data";
 import { supabaseAdmin } from "@/lib/supabase";
+import { FONTE_PADRAO } from "@/lib/fonte";
 import { periodNow } from "@/lib/calc";
 import { productIdsFor, type BU } from "@/lib/products";
 import ConfiguracoesSubnav from "@/components/ConfiguracoesSubnav";
@@ -40,15 +41,17 @@ export default async function VendasPage({
   let q = supabaseAdmin
     .from("sales")
     .select("id, seller_id, sale_date, product_line, valor, quantidade, cliente_nome, observacao, ligacao_status, indicacao_status, created_at")
-    // So o que foi lancado A MAO. As linhas do Conta Azul (origem =
-    // 'conta_azul') existem desde a integracao, mas vivem exclusivamente no GAV
-    // (/admin/gav) — nenhuma tela que ja funcionava pode mudar de numero nem
-    // mostrar dado novo. Ver src/lib/fonte.ts.
-    .eq("origem", "manual")
+    // Segue a fonte das telas (hoje: Conta Azul). Antes do cutover isto era
+    // "manual" fixo, sob a regra de que nenhuma tela existente podia mudar de
+    // numero. A regra se inverteu: ficar em "manual" agora congelaria esta tela
+    // no historico e ela mostraria menos do que o painel. Ver src/lib/fonte.ts.
+    .eq("origem", FONTE_PADRAO)
     .gte("sale_date", firstDay)
     .lt("sale_date", lastDay)
     .order("sale_date", { ascending: false })
-    .order("created_at", { ascending: false });
+    // Desempate por `id`: `created_at` das linhas do Conta Azul e a hora do
+    // ultimo sync (a ponte apaga e reinsere a janela), nao a da venda.
+    .order("id", { ascending: false });
 
   if (sellerId) q = q.eq("seller_id", sellerId);
   if (buFilter) {

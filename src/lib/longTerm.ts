@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./supabase";
 import { COLEGIO_MATRICULAS_IDS, type BU } from "./products";
 import { isBusinessDay, nowRecife } from "./calc";
 import { buListOf, fetchAll, listSellers } from "./data";
+import { FONTE_PADRAO } from "./fonte";
 
 export type LongTermGoal = {
   id: string;
@@ -145,9 +146,10 @@ export async function computeLongTermProgress(
       supabaseAdmin
         .from("sales")
         .select("quantidade")
-        // Meta longa conta matricula lancada a mao. Somar o Conta Azul aqui
-        // mudaria um numero que ja esta no ar. Ver src/lib/fonte.ts.
-        .eq("origem", "manual")
+        // Segue a fonte das telas. Travado em "manual", o progresso da meta
+        // longa pararia no dia do cutover e nunca mais subiria — o pior jeito
+        // de errar, porque parece so "ninguem vendeu". Ver src/lib/fonte.ts.
+        .eq("origem", FONTE_PADRAO)
         .in("seller_id", sellerIds)
         .in("product_line", productIds)
         .gte("sale_date", firstDay)

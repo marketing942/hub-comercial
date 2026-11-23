@@ -3,7 +3,39 @@ import { getSession } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { todayISORecife } from "@/lib/calc";
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+/**
+ * Editar e apagar venda — FECHADOS no cutover de 2026-11-23.
+ *
+ * As duas rotas só alcançavam `origem = 'manual'`, e o lançamento à mão acabou.
+ * O que sobrou com essa origem é HISTÓRICO: é contra ele que o GAV confere o
+ * que o Conta Azul trouxe. Um PATCH agora não corrigiria nada visível — só
+ * estragaria a única prova de que a conferência fechou.
+ *
+ * Os corpos originais seguem abaixo, inalcançáveis, como caminho de volta.
+ */
+function fechado() {
+  return NextResponse.json(
+    {
+      error:
+        "Editar e remover vendas foi desativado. O faturamento agora vem do Conta Azul automaticamente.",
+    },
+    { status: 410 },
+  );
+}
+
+export async function PATCH(_req: Request, _ctx: { params: { id: string } }) {
+  const s = await getSession();
+  if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
+  return fechado();
+}
+
+export async function DELETE(_req: Request, _ctx: { params: { id: string } }) {
+  const s = await getSession();
+  if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
+  return fechado();
+}
+
+async function PATCH_DESATIVADO(req: Request, { params }: { params: { id: string } }) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
   const b = await req.json();
@@ -44,7 +76,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+async function DELETE_DESATIVADO(_: Request, { params }: { params: { id: string } }) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
   let q = supabaseAdmin.from("sales").delete().eq("id", params.id).eq("origem", "manual");
