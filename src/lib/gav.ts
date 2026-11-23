@@ -256,7 +256,19 @@ async function contarPendencias(year: number, month: number): Promise<Pendencias
     const escolhido = mItem && !mItem.ignorar && mItem.product_line ? mItem : mItem?.ignorar ? mItem : mCat;
     // Resolvido (tem linha) ou ignorado de propósito: não está parado.
     if (escolhido && (escolhido.ignorar || escolhido.product_line)) continue;
-    const x = Number(it.valor ?? 0);
+    /**
+     * `valor` é UNITÁRIO — o total da linha é valor × quantidade.
+     *
+     * Medido na base em 23/11/2026: um item "Ingresso COMUM" com quantidade 50
+     * e `valor` R$ 0,96 pertence a uma venda cujo total é R$ 48,00. E em 1.834
+     * vendas, `soma(valor × quantidade)` casa com `ca_vendas.total` em 1.817,
+     * contra 1.793 de `soma(valor)` — é a leitura certa, e é a mesma que
+     * `sales` usa (lá `valor` e `quantidade` vão em colunas separadas e a tela
+     * multiplica). Sem o fator, um lote de 50 ingressos preso apareceria aqui
+     * como R$ 0,96 em vez de R$ 48,00, e este número existe justamente para
+     * dizer o tamanho do que está parado.
+     */
+    const x = Number(it.valor ?? 0) * (Number(it.quantidade) || 1);
     valor += x;
     const quem = v.vendedor_nome || "(sem vendedor)";
     porVend.set(quem, (porVend.get(quem) ?? 0) + x);
