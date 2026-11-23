@@ -200,6 +200,22 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
     const catMapa = v.categoria_ca_id ? mapaCategoria.get(v.categoria_ca_id as string) : undefined;
 
     for (const it of lista) {
+      /**
+       * ⚠️ `ca_venda_itens.valor` é o preço UNITÁRIO, não o total da linha.
+       *
+       * Provado em 2026-11-23: um item x50 a R$ 0,96 numa venda de R$ 48,00. Já
+       * `sales.valor` do lançamento à mão sempre foi o TOTAL — o modal pede
+       * "Valor da venda", não preço unitário. A mesma coluna com dois
+       * significados fazia o painel contar R$ 0,96 onde entraram R$ 48,00.
+       *
+       * A conversão mora AQUI, na fronteira, e não nos ~12 pontos que somam
+       * `valor` espalhados por `data.ts` e `gav.ts`: dali para dentro, `valor`
+       * quer dizer uma coisa só. `quantidade` segue sendo a contagem, que é o
+       * que as BUs de meta por quantidade usam.
+       */
+      const qtdLinha = Math.max(1, Math.round(it.quantidade || 1));
+      const totalLinha = it.valor * qtdLinha;
+
       // Item tem a palavra final quando classificado; categoria é a rede embaixo.
       const itMapa = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
       const escolhido: MapaLinha | undefined =
@@ -213,21 +229,21 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
         if (escolhido?.ignorar) r.ignorados++;
         else {
           r.pendentes++;
-          r.valorPendente += it.valor;
+          r.valorPendente += totalLinha;
         }
         continue;
       }
       if (!escolhido.product_line) {
         r.pendentes++;
-        r.valorPendente += it.valor;
+        r.valorPendente += totalLinha;
         continue;
       }
 
       const base = {
         sale_date: v.data as string,
         product_line: escolhido.product_line,
-        valor: it.valor,
-        quantidade: Math.max(1, Math.round(it.quantidade || 1)),
+        valor: totalLinha,
+        quantidade: qtdLinha,
         origem: "conta_azul" as const,
         ca_venda_id: vid,
         ca_item_id: it.ca_id,
@@ -250,8 +266,8 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
           sale_date: base.sale_date,
           bu: escolhido.bu,
           product_line: escolhido.product_line,
-          valor: it.valor,
-          quantidade: it.quantidade || 1,
+          valor: totalLinha,
+          quantidade: qtdLinha,
           conta_vendedor: false,
           cliente_ca_id: (v.cliente_ca_id as string) ?? null,
           vendedor_ca_id: (v.vendedor_ca_id as string) ?? null,
@@ -281,22 +297,22 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
       const herdeiro = escolhido.bu ? donoDaBu.get(escolhido.bu) : undefined;
       if (herdeiro) {
         r.herdadosPelaBu++;
-        r.valorHerdado += it.valor;
+        r.valorHerdado += totalLinha;
         paraSales.push({ ...base, seller_id: herdeiro });
         continue;
       }
 
       // Sem herdeiro: fica visível em "sem dono" em vez de sumir.
       r.semDono++;
-      r.valorSemDono += it.valor;
+      r.valorSemDono += totalLinha;
       paraGrupo.push({
         ca_venda_id: vid,
         ca_item_id: it.ca_id,
         sale_date: base.sale_date,
         bu: escolhido.bu,
         product_line: escolhido.product_line,
-        valor: it.valor,
-        quantidade: it.quantidade || 1,
+        valor: totalLinha,
+        quantidade: qtdLinha,
         conta_vendedor: true,
         cliente_ca_id: (v.cliente_ca_id as string) ?? null,
         vendedor_ca_id: (v.vendedor_ca_id as string) ?? null,

@@ -86,26 +86,6 @@ export async function gravarEspelho(
     if (error) throw new Error(`limpar ca_vendas: ${error.message}`);
   }
 
-  /**
-   * Itens não têm data própria, então a janela não os alcança: remove os que
-   * ficaram sem venda viva. Sem isto, o item de uma venda cancelada continuaria
-   * no espelho e voltaria a virar faturamento na próxima normalização.
-   */
-  let orfaosRemovidos = 0;
-  {
-    // PAGINADO — `.limit(50000)` era cortado em 1.000 e deixava órfão para trás.
-    const data = await lerTudo<{ ca_id: string; venda_ca_id: string }>("ca_venda_itens", "ca_id, venda_ca_id");
-    const orfaos = data.filter((o) => !vivos.has(o.venda_ca_id)).map((o) => o.ca_id);
-    for (let i = 0; i < orfaos.length; i += 300) {
-      const { error } = await supabaseAdmin
-        .from("ca_venda_itens")
-        .delete()
-        .in("ca_id", orfaos.slice(i, i + 300));
-      if (error) throw new Error(`limpar itens órfãos: ${error.message}`);
-    }
-    orfaosRemovidos = orfaos.length;
-  }
-
   // ---- regrava --------------------------------------------------------
   for (let i = 0; i < vendas.length; i += 500) {
     const { error } = await supabaseAdmin
@@ -118,6 +98,48 @@ export async function gravarEspelho(
       .from("ca_venda_itens")
       .upsert(itens.slice(i, i + 500), { onConflict: "ca_id" });
     if (error) throw new Error(`gravar ca_venda_itens: ${error.message}`);
+  }
+
+  /**
+   * Itens não têm data própria, então a janela não os alcança: remove os que
+   * ficaram sem venda viva. Sem isto, o item de uma venda cancelada continuaria
+   * no espelho e voltaria a virar faturamento na próxima normalização.
+   *
+   * ⚠️ ÓRFÃO É ITEM SEM VENDA NA TABELA — não "item fora deste empurrão".
+   *
+   * Até 2026-11-23 a comparação era contra `vivos`, o conjunto de vendas do
+   * payload ATUAL. Com um empurrão só por rodada isso parecia certo e funcionou
+   * por meses. Quebrou no dia em que a ponte passou a mandar o histórico em
+   * FATIAS: cada fatia apagava os itens de todas as outras, e ao fim de seis
+   * fatias o espelho tinha 6.770 vendas e 1.897 itens.
+   *
+   * O estrago não aparece de imediato — `sales` continua certo, porque cada
+   * fatia normaliza enquanto os seus itens ainda estão lá. Ele aparece DEPOIS:
+   * reprocessar um mês antigo pela tela de Classificação leria zero itens e
+   * apagaria o faturamento daquele mês.
+   *
+   * Agora a referência é a própria `ca_vendas`, que é onde "venda viva" mora.
+   * Fica correto para um empurrão ou para cem, e independe da ordem das fatias.
+   *
+   * Roda DEPOIS da regravação das duas tabelas, e não antes: no meio do
+   * caminho as vendas da janela já foram apagadas e ainda não voltaram, então
+   * ali TODO item da janela pareceria órfão.
+   */
+  let orfaosRemovidos = 0;
+  {
+    // PAGINADO — `.limit(50000)` era cortado em 1.000 e deixava órfão para trás.
+    const data = await lerTudo<{ ca_id: string; venda_ca_id: string }>("ca_venda_itens", "ca_id, venda_ca_id");
+    const todasAsVendas = await lerTudo<{ ca_id: string }>("ca_vendas", "ca_id");
+    const existentes = new Set(todasAsVendas.map((v) => v.ca_id));
+    const orfaos = data.filter((o) => !existentes.has(o.venda_ca_id)).map((o) => o.ca_id);
+    for (let i = 0; i < orfaos.length; i += 300) {
+      const { error } = await supabaseAdmin
+        .from("ca_venda_itens")
+        .delete()
+        .in("ca_id", orfaos.slice(i, i + 300));
+      if (error) throw new Error(`limpar itens órfãos: ${error.message}`);
+    }
+    orfaosRemovidos = orfaos.length;
   }
 
   /**
