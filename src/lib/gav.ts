@@ -54,7 +54,7 @@ export type Comparacao = {
    * Classificação: vendedor novo no Conta Azul aparece aqui no dia seguinte,
    * em vez de depender de alguém lembrar de abrir a outra tela.
    */
-  pendencias: { categorias: number; itens: number; vendedores: number };
+  pendencias: Pendencias;
 };
 
 const variacao = (manual: number, ca: number): number | null =>
@@ -68,7 +68,7 @@ export async function compararFontes(year: number, month: number): Promise<Compa
   const [manual, ca, pendencias] = await Promise.all([
     statsForAll({ year, month, fonte: FONTE_PADRAO }),
     statsForAll({ year, month, fonte: "conta_azul" satisfies Fonte }),
-    contarPendencias(),
+    contarPendencias(year, month),
   ]);
 
   /**
@@ -145,7 +145,26 @@ export async function compararFontes(year: number, month: number): Promise<Compa
  * Um contador que não se pode zerar também é ruído, então item em venda que a
  * categoria já resolve continua fora da conta — classificá-lo não mudaria nada.
  */
-async function contarPendencias(): Promise<{ categorias: number; itens: number; vendedores: number }> {
+export type Pendencias = {
+  categorias: number;
+  itens: number;
+  vendedores: number;
+  /**
+   * QUANTO está parado no mês exibido — o dado que faltava.
+   *
+   * Até 23/11/2026 esta função devolvia só contagens, e o aviso da tela dizia
+   * "2 itens". Dois itens de matrícula do Colégio sem série classificada
+   * seguravam R$ 1.998 daquele mês, dos quais R$ 1.588 eram da Giovana — e a
+   * conferência mostrava a diferença dela em −17% sem dizer de onde vinha.
+   * Ninguém liga "2 itens" a "faltam R$ 1.588 na Giovana"; ficou doze dias
+   * assim. A contagem não mede o estrago, o valor mede.
+   */
+  valor: number;
+  /** De quem é o dinheiro parado, pelo vendedor marcado na venda no CA. */
+  porVendedor: { nome: string; valor: number }[];
+};
+
+async function contarPendencias(year: number, month: number): Promise<Pendencias> {
   const n = async (tabela: string, aplicar: (q: ReturnType<typeof supabaseAdmin.from>) => unknown) => {
     const q = supabaseAdmin.from(tabela).select("*", { count: "exact", head: true });
     const { count } = (await (aplicar(q as never) as Promise<{ count: number | null }>)) ?? { count: 0 };
@@ -202,7 +221,52 @@ async function contarPendencias(): Promise<{ categorias: number; itens: number; 
     for (const id of alvo) if (!resolve(porItem.get(id))) itens++;
   }
 
-  return { categorias, itens, vendedores };
+  /**
+   * O VALOR parado no mês exibido, e de quem é.
+   *
+   * Reproduz a precedência do normalizador — item classificado tem a palavra
+   * final, categoria é a rede embaixo — porque qualquer outra regra aqui
+   * mostraria um número que não casa com o que de fato caiu fora de `sales`.
+   *
+   * Escopo: o mês da tela, e não a base inteira. Este número existe para
+   * explicar a diferença daquele mês; somar o histórico daria um valor grande
+   * e sem relação com a linha que está logo abaixo.
+   */
+  const de = `${year}-${String(month).padStart(2, "0")}-01`;
+  const ate = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const vendasMes = await lerTudo<{ ca_id: string; categoria_ca_id: string | null; vendedor_nome: string | null }>(
+    "ca_vendas",
+    "ca_id, categoria_ca_id, vendedor_nome",
+    { filtrar: (q) => (q as never as { gte: Function }).gte("data", de).lt("data", ate) },
+  );
+  const doMes = new Map(vendasMes.map((v) => [v.ca_id, v]));
+  const itensMes = await lerTudo<{ venda_ca_id: string; item_ca_id: string | null; valor: number | null; quantidade: number | null }>(
+    "ca_venda_itens",
+    "ca_id, venda_ca_id, item_ca_id, valor, quantidade",
+  );
+
+  let valor = 0;
+  const porVend = new Map<string, number>();
+  for (const it of itensMes) {
+    const v = doMes.get(it.venda_ca_id);
+    if (!v) continue;
+    const mItem = it.item_ca_id ? porItem.get(it.item_ca_id) : undefined;
+    const mCat = v.categoria_ca_id ? porCategoria.get(v.categoria_ca_id) : undefined;
+    // Mesma escolha do normalizador: item decide quando classificado.
+    const escolhido = mItem && !mItem.ignorar && mItem.product_line ? mItem : mItem?.ignorar ? mItem : mCat;
+    // Resolvido (tem linha) ou ignorado de propósito: não está parado.
+    if (escolhido && (escolhido.ignorar || escolhido.product_line)) continue;
+    const x = Number(it.valor ?? 0);
+    valor += x;
+    const quem = v.vendedor_nome || "(sem vendedor)";
+    porVend.set(quem, (porVend.get(quem) ?? 0) + x);
+  }
+
+  const porVendedor = [...porVend]
+    .map(([nome, valor]) => ({ nome, valor }))
+    .sort((a, b) => b.valor - a.valor);
+
+  return { categorias, itens, vendedores, valor, porVendedor };
 }
 
 /**

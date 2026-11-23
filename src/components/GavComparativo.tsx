@@ -78,14 +78,52 @@ export default function GavComparativo({ dados }: { dados: Comparacao }) {
       {totalPendente > 0 ? (
         <Link
           href="/admin/gav/mapa"
-          className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 text-xs transition-opacity hover:opacity-80"
+          className="mb-3 block rounded-lg px-3 py-2 text-xs transition-opacity hover:opacity-80"
           style={{ background: `${COLOR.warning}1a`, color: COLOR.warning }}
         >
-          <strong>Esperando classificação:</strong>
-          {pendencias.categorias > 0 ? <span>{pendencias.categorias} categorias</span> : null}
-          {pendencias.itens > 0 ? <span>· {pendencias.itens} itens</span> : null}
-          {pendencias.vendedores > 0 ? <span>· {pendencias.vendedores} vendedores</span> : null}
-          <span className="opacity-70">— enquanto isso, essa receita não entra em lugar nenhum.</span>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <strong>Esperando classificação:</strong>
+            {pendencias.categorias > 0 ? <span>{pendencias.categorias} categorias</span> : null}
+            {pendencias.itens > 0 ? <span>· {pendencias.itens} itens</span> : null}
+            {pendencias.vendedores > 0 ? <span>· {pendencias.vendedores} vendedores</span> : null}
+            <span className="opacity-70">— enquanto isso, essa receita não entra em lugar nenhum.</span>
+          </span>
+
+          {/*
+            QUANTO, e de quem.
+
+            A linha de cima conta; esta mede. Antes só existia a contagem, e
+            "2 itens" segurou R$ 1.998 de novembro de 2026 — R$ 1.588 deles da
+            Giovana, cuja diferença aparecia aqui embaixo como −17% sem dizer
+            de onde vinha. Ninguém faz essa ligação de cabeça.
+
+            Quando o mês exibido não tem nada preso, a linha DIZ isso em vez de
+            sumir. Sumir devolveria a ambiguidade que criou o problema: quem lê
+            "2 itens" sem valor nenhum não sabe se são R$ 2 mil ou R$ 0, e a
+            diferença logo abaixo continua sem explicação. Pendência de
+            categoria ou de vendedor existe sem um centavo preso neste mês, e
+            isso é uma informação, não uma ausência.
+          */}
+          <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            {pendencias.valor > 0 ? (
+              <>
+                <strong className="font-mono text-sm tabular-nums">{brl(pendencias.valor)}</strong>
+                <span className="opacity-70">
+                  parados em {String(dados.month).padStart(2, "0")}/{dados.year}
+                </span>
+                {pendencias.porVendedor.slice(0, 3).map((v) => (
+                  <span key={v.nome} className="opacity-90">
+                    · {v.nome} {brl(v.valor)}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <span className="opacity-70">
+                Nada parado em {String(dados.month).padStart(2, "0")}/{dados.year} — a diferença
+                abaixo, se houver, é outra coisa.
+              </span>
+            )}
+          </span>
         </Link>
       ) : null}
 
