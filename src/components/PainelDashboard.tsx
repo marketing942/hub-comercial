@@ -1,5 +1,5 @@
 /**
- * O dashboard (carrossel de slides) — compartilhado por `/dashboard` e `/admin/gav`.
+ * O dashboard (carrossel de slides) — usado por `/dashboard`.
  *
  * ## Por que existe
  *
@@ -68,13 +68,10 @@ export default async function PainelDashboard({
   year,
   month,
   fonte,
-  /** Conteúdo extra acima do carrossel — o GAV põe a faixa de comparação aqui. */
-  topo,
 }: {
   year: number;
   month: number;
   fonte: Fonte;
-  topo?: React.ReactNode;
 }) {
   const totalDays = daysInMonth(year, month);
   const day = todayDayOfMonth(year, month);
@@ -152,7 +149,6 @@ export default async function PainelDashboard({
 
   return (
     <>
-      {topo}
       <DashboardCarousel
         slides={slides}
         intervalSec={25}

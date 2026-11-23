@@ -14,16 +14,13 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const items: SidebarItem[] = isAdmin
     ? [
         { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
-        // GAV: o dashboard lendo o Conta Azul, para conferir antes do cutover.
-        // So admin — ate a conferencia fechar estes numeros ainda podem estar
-        // errados, e vendedor vendo a propria meta com numero que nao vale passa a
-        // discutir o numero em vez de vender. Ver src/lib/fonte.ts.
+        // GAV: so admin. Hoje tem a aba Vendas (mes a mes e vendas do mes do Conta Azul).
         { href: "/admin/gav", label: "GAV", icon: "chart" },
         {
           href: "/admin/sellers",
           label: "Configuracoes",
           icon: "settings",
-          activePrefixes: ["/admin/goals", "/admin/vendas", "/admin/comissoes", "/admin/leads", "/admin/direto", "/admin/ano"],
+          activePrefixes: ["/admin/goals", "/admin/vendas", "/admin/comissoes", "/admin/leads", "/admin/direto", "/admin/ano", "/admin/classificacao"],
         },
       ]
     : [

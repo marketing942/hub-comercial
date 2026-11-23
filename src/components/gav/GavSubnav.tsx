@@ -10,11 +10,9 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gauge, ShoppingCart, Tags } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 
 const TABS = [
-  { href: "/admin/gav", label: "Painel", icon: <Gauge className="w-3.5 h-3.5" /> },
-  { href: "/admin/gav/mapa", label: "Classificacao", icon: <Tags className="w-3.5 h-3.5" /> },
   // "Conexao e sync" saiu do menu em 2026-11-23: com o Jarvis empurrando o
   // espelho a cada 15 min, nao ha mais o que disparar a mao no dia a dia. A
   // rota continua de pe e a pagina de Vendas linka para ela no rodape.
@@ -29,9 +27,7 @@ export default function GavSubnav() {
         <div className="mr-1 hidden text-[11px] uppercase tracking-wider text-white/40 sm:block">GAV</div>
         <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-xl border border-border bg-panel p-1 sm:inline-flex">
           {TABS.map((t) => {
-            // `/admin/gav` e prefixo de todas as outras: so marca ativo no
-            // caminho exato, senao "Painel" ficaria aceso em todas as abas.
-            const active = t.href === "/admin/gav" ? pathname === t.href : pathname.startsWith(t.href);
+            const active = pathname.startsWith(t.href);
             return (
               <Link
                 key={t.href}
