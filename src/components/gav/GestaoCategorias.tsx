@@ -7,9 +7,8 @@ import ProgressBar from "@/components/ProgressBar";
 /**
  * Receita por categoria — TODAS as linhas de receita do Conta Azul no mes, as
  * dos vendedores e as que existem so no grupo (mensalidade, repasse...),
- * agrupadas por BU, com o subtotal de cada uma. As 12 series do Colegio sao uma
- * categoria so (Matriculas do Colegio). "Sem classificacao" e receita do Conta
- * Azul que ainda nao tem linha. A barra e a fatia do faturamento total.
+ * agrupadas por BU, com o subtotal de cada uma. As categorias sao as do proprio
+ * Conta Azul. A barra e a fatia do faturamento total.
  */
 export default function GestaoCategorias({ dados }: { dados: GestaoMes }) {
   const { categorias, total } = dados;
@@ -57,7 +56,7 @@ export default function GestaoCategorias({ dados }: { dados: GestaoMes }) {
                     <li key={c.chave} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto]">
                       <span className="truncate text-sm text-white/85">{c.rotulo}</span>
                       <span className="order-3 col-span-2 sm:order-none sm:col-span-1">
-                        <ProgressBar value={pct} color={g.bu === "pendente" ? COLOR.warning : COLOR.gold} height={6} />
+                        <ProgressBar value={pct} color={COLOR.gold} height={6} />
                       </span>
                       <span className="text-right text-sm font-semibold tabular-nums">
                         {BRL.format(c.valor)}

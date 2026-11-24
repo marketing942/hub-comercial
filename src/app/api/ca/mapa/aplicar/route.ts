@@ -50,7 +50,8 @@ export async function POST() {
 
   // ---- categorias -------------------------------------------------------
   for (const c of mapa.categorias) {
-    if (c.product_line || c.ignorar) continue;
+    // Categoria classificada = tem BU (a linha de receita e a propria categoria).
+    if (c.bu || c.product_line || c.ignorar) continue;
     const p = palpitarCategoria(c.ca_nome);
     if (!p || (!p.product_line && !p.ignorar && !p.bu)) {
       semSugestao.push(c.ca_nome ?? c.ca_id);

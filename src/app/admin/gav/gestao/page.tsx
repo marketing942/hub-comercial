@@ -4,7 +4,6 @@ import Cell from "@/components/StatCell";
 import GestaoCategorias from "@/components/gav/GestaoCategorias";
 import BotaoTelaCheia from "@/components/gav/BotaoTelaCheia";
 import GestaoGrafico from "@/components/gav/GestaoGraficoLazy";
-import { COLOR } from "@/lib/brand";
 import { BRL, fmtPct, periodNow } from "@/lib/calc";
 import { gestaoDoMes } from "@/lib/gestaoAVista";
 import { COR_ORIGEM, ORIGEM_ROTULO, type Origem } from "@/lib/gestaoAVistaTipos";
@@ -33,7 +32,6 @@ export default async function GestaoPage({
   for (let a = agora.year; a >= Math.max(YEAR_MIN, agora.year - 3); a--) anos.push(a);
 
   const origens: Origem[] = ["vendedores", "direto", "diretoria"];
-  const pendente = dados.porOrigem.pendente;
   const pct = (v: number) => (dados.total > 0 ? fmtPct((v / dados.total) * 100) : "—");
 
   return (
@@ -85,7 +83,6 @@ export default async function GestaoPage({
         <div className="-ml-px -mt-px grid grid-cols-2 md:grid-cols-4">
           <Cell label={`Total ${MES_CURTO[mes - 1]}/${year}`} value={BRL.format(dados.total)}>
             Todas as linhas de receita
-            {pendente > 0 ? <> · inclui <span style={{ color: COLOR.warning }}>{BRL.format(pendente)}</span> sem classificação</> : null}
           </Cell>
           {origens.map((o) => (
             <Cell key={o} label={ORIGEM_ROTULO[o]} value={BRL.format(dados.porOrigem[o])}>
@@ -100,6 +97,15 @@ export default async function GestaoPage({
         </div>
       </section>
 
+      {dados.semTabela ? (
+        <div className="panel p-4 text-sm" style={{ borderColor: "rgba(240,180,76,0.45)" }}>
+          <div className="eyebrow-label" style={{ color: "#f0b44c" }}>Falta criar a tabela</div>
+          <p className="mt-1.5 text-white/70">
+            Rode <b>supabase/ca-03-linha-receita.sql</b> no SQL Editor do Supabase e clique em Reprocessar (Conexao e sync).
+          </p>
+        </div>
+      ) : null}
+
       <GestaoGrafico dias={dados.dias} categorias={dados.categorias} />
 
       <GestaoCategorias dados={dados} />
@@ -112,9 +118,9 @@ export default async function GestaoPage({
         ) : (
           <>Nunca sincronizado. </>
         )}
-        Receita sem classificacao aparece em laranja ate alguem classificar —{" "}
+        Categorias do proprio Conta Azul; vendedor, direto e diretoria vem da{" "}
         <Link href="/admin/classificacao" className="underline hover:text-white/60">
-          ver Classificacao
+          Classificacao
         </Link>
         .{" "}
         <Link href="/admin/gav/conexao" className="underline hover:text-white/60">

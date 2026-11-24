@@ -6,15 +6,14 @@
 import { COLOR } from "./brand";
 import type { BU } from "./products";
 
-/** Quem trouxe a receita. `pendente` = item do Conta Azul ainda sem classificacao. */
-export type Origem = "vendedores" | "direto" | "diretoria" | "pendente";
-export const ORIGENS: Origem[] = ["vendedores", "direto", "diretoria", "pendente"];
+/** Quem trouxe a receita (decidido pela classificacao de vendedores + a regra "conta p/ vendedor"). */
+export type Origem = "vendedores" | "direto" | "diretoria";
+export const ORIGENS: Origem[] = ["vendedores", "direto", "diretoria"];
 
 export const ORIGEM_ROTULO: Record<Origem, string> = {
   vendedores: "Vendedores",
   direto: "Direto",
   diretoria: "Diretoria / Grupo",
-  pendente: "Sem classificação",
 };
 
 /** Cor de cada origem (identidade da serie no grafico, nao resultado). */
@@ -22,19 +21,17 @@ export const COR_ORIGEM: Record<Origem, string> = {
   vendedores: COLOR.gold,
   direto: COLOR.info,
   diretoria: COLOR.mute,
-  pendente: COLOR.warning,
 };
 
-/** BU da receita. `grupo` = receita do grupo sem BU; `pendente` = sem classificacao. */
-export type BuKey = BU | "grupo" | "pendente";
-export const BUS_GESTAO: BuKey[] = ["cppem", "unicive", "colegio_cppem", "grupo", "pendente"];
+/** BU da receita. `grupo` = categoria do Conta Azul sem BU definida. */
+export type BuKey = BU | "grupo";
+export const BUS_GESTAO: BuKey[] = ["cppem", "unicive", "colegio_cppem", "grupo"];
 
 export const BU_GESTAO_ROTULO: Record<BuKey, string> = {
   cppem: "CPPEM",
   unicive: "UNICIVE",
   colegio_cppem: "Colégio CPPEM",
-  grupo: "Outras do grupo",
-  pendente: "Sem classificação",
+  grupo: "Sem BU definida",
 };
 
 /** Cores por BU no grafico: so identidade (ver CLAUDE.md §2). */
@@ -43,7 +40,6 @@ export const COR_BU: Record<BuKey, string> = {
   unicive: "#F5C518",
   colegio_cppem: "#5B8FE0",
   grupo: COLOR.mute,
-  pendente: COLOR.warning,
 };
 
 /** Paleta das categorias de receita no grafico (a cor so distingue a serie). */
@@ -75,15 +71,17 @@ export type LinhaCategoria = {
 export type GestaoMes = {
   year: number;
   mes: number;
-  /** Faturamento da empresa no mes: classificado + sem classificacao. */
+  /** Faturamento da empresa no mes (todas as linhas do Conta Azul). */
   total: number;
   porOrigem: Record<Origem, number>;
   /** Parte da Diretoria/Grupo que conta para vendedor mas chegou sem dono. */
   semDono: number;
   dias: DiaGestao[];
   categorias: LinhaCategoria[];
+  /** A tabela `ca_linha_receita` ainda nao existe (rodar supabase/ca-03-linha-receita.sql). */
+  semTabela: boolean;
   sync: { em: string | null; erro: string | null };
 };
 
-export const vazioOrigem = (): Record<Origem, number> => ({ vendedores: 0, direto: 0, diretoria: 0, pendente: 0 });
-export const vazioBu = (): Record<BuKey, number> => ({ cppem: 0, unicive: 0, colegio_cppem: 0, grupo: 0, pendente: 0 });
+export const vazioOrigem = (): Record<Origem, number> => ({ vendedores: 0, direto: 0, diretoria: 0 });
+export const vazioBu = (): Record<BuKey, number> => ({ cppem: 0, unicive: 0, colegio_cppem: 0, grupo: 0 });

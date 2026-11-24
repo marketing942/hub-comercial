@@ -30,10 +30,12 @@ import { buListOf, listSellers } from "@/lib/data";
 import { situacaoConta } from "./config";
 import { lerPorChaves, lerTudo } from "./ler";
 import { LINHAS_VENDEDOR, linhaValida } from "./linhas";
+import { palpitarCategoria } from "./sugestao";
 
 type Destino = "vendedor" | "canal_direto" | "grupo" | "pendente";
 
 interface MapaLinha {
+  nome?: string | null;
   bu: string | null;
   product_line: string | null;
   conta_vendedor: boolean;
@@ -56,6 +58,10 @@ export interface ResultadoNormalizacao {
   valorHerdado: number;
   ignorados: number;
   linhaInvalida: number;
+  /** Linhas gravadas em `ca_linha_receita` (receita por categoria do Conta Azul). */
+  paraLinha: number;
+  /** A tabela `ca_linha_receita` ainda nao existe (rodar supabase/ca-03-linha-receita.sql). */
+  linhaReceitaAusente?: boolean;
 }
 
 const vazio = (): ResultadoNormalizacao => ({
@@ -71,6 +77,7 @@ const vazio = (): ResultadoNormalizacao => ({
   valorHerdado: 0,
   ignorados: 0,
   linhaInvalida: 0,
+  paraLinha: 0,
 });
 
 /**
@@ -121,12 +128,13 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
   // ---- 2. Mapas ----------------------------------------------------------
   const mapaRaw = await lerTudo<Record<string, unknown>>(
     "ca_mapa_receita",
-    "ca_tipo, ca_id, bu, product_line, conta_vendedor, ignorar",
+    "ca_tipo, ca_id, ca_nome, bu, product_line, conta_vendedor, ignorar",
   );
   const mapaCategoria = new Map<string, MapaLinha>();
   const mapaItem = new Map<string, MapaLinha>();
   for (const m of mapaRaw) {
     const linha: MapaLinha = {
+      nome: (m.ca_nome as string) ?? null,
       bu: (m.bu as string) ?? null,
       product_line: (m.product_line as string) ?? null,
       conta_vendedor: !!m.conta_vendedor,
@@ -180,7 +188,12 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
     for (const [bu, ids] of porBu) if (ids.length === 1) donoDaBu.set(bu, ids[0]);
   }
 
+  // Venda sem categoria (nasce no site): a categoria vem do HISTORICO do item —
+  // a que ele mais teve em outras vendas. Automatico: ninguem liga item a nada.
+  const categoriaDoItem = vendas.some((v) => !v.categoria_ca_id) ? await categoriaDominantePorItem() : new Map<string, string>();
+
   // ---- 3. Classifica cada item -------------------------------------------
+  const paraLinha: Record<string, unknown>[] = [];
   const paraSales: Record<string, unknown>[] = [];
   const paraDireto: Record<string, unknown>[] = [];
   const paraGrupo: Record<string, unknown>[] = [];
@@ -215,6 +228,58 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
        */
       const qtdLinha = Math.max(1, Math.round(it.quantidade || 1));
       const totalLinha = it.valor * qtdLinha;
+
+      // ---- Receita por CATEGORIA DO CONTA AZUL (alimenta a Gestao a Vista) ----
+      // Vale para TODO item que conta como faturamento, tenha ou nao linha no
+      // Hub. BU e "conta p/ vendedor" saem da categoria (mapa, ou o palpite pelo
+      // nome enquanto ninguem classificou); item classificado a mao manda.
+      {
+        const catId = (v.categoria_ca_id as string | null) ?? (it.item_ca_id ? categoriaDoItem.get(it.item_ca_id) ?? null : null);
+        const catMapa2 = catId ? mapaCategoria.get(catId) : undefined;
+        const itMapa2 = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
+        const nome = catMapa2?.nome || (catId ? `Categoria ${catId.slice(0, 8)}` : "Sem categoria no Conta Azul");
+        const palpite = !catMapa2?.bu && !catMapa2?.ignorar ? palpitarCategoria(catMapa2?.nome ?? null) : null;
+        const itemFechado = !!(itMapa2 && (itMapa2.ignorar || itMapa2.product_line));
+        const ignorarFato = itemFechado ? itMapa2!.ignorar : !!(catMapa2?.ignorar || palpite?.ignorar);
+        if (!ignorarFato) {
+          const buFato = (itemFechado ? itMapa2!.bu : catMapa2?.bu || palpite?.bu) || null;
+          const contaFato = itemFechado
+            ? itMapa2!.conta_vendedor
+            : catMapa2?.bu
+              ? catMapa2.conta_vendedor
+              : (palpite?.conta_vendedor ?? false);
+          let origem: "vendedores" | "direto" | "diretoria" = "diretoria";
+          let sellerFato: string | null = null;
+          let semDono = false;
+          if (contaFato) {
+            if (destino === "vendedor" && vend?.seller_id) {
+              origem = "vendedores";
+              sellerFato = vend.seller_id;
+            } else if (destino === "canal_direto") {
+              origem = "direto";
+            } else {
+              const herdeiro = buFato ? donoDaBu.get(buFato) : undefined;
+              if (herdeiro) {
+                origem = "vendedores";
+                sellerFato = herdeiro;
+              } else semDono = true;
+            }
+          }
+          paraLinha.push({
+            ca_venda_id: vid,
+            ca_item_id: it.ca_id,
+            sale_date: v.data as string,
+            valor: totalLinha,
+            quantidade: qtdLinha,
+            categoria_id: catId,
+            categoria_nome: nome,
+            bu: buFato,
+            origem,
+            seller_id: sellerFato,
+            sem_dono: semDono,
+          });
+        }
+      }
 
       // Item tem a palavra final quando classificado; categoria é a rede embaixo.
       const itMapa = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
@@ -340,6 +405,22 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
     if (error) throw new Error(`limpar ca_receita: ${error.message}`);
   }
 
+  // Receita por categoria do Conta Azul. Se a tabela ainda nao existe (SQL
+  // ca-03 por rodar), nao derruba o resto da normalizacao: so avisa.
+  {
+    const del = await supabaseAdmin.from("ca_linha_receita").delete().gte("sale_date", de).lte("sale_date", ate);
+    if (del.error) {
+      r.linhaReceitaAusente = true;
+      console.error("ca_linha_receita indisponivel:", del.error.message);
+    } else {
+      for (let i = 0; i < paraLinha.length; i += 500) {
+        const { error } = await supabaseAdmin.from("ca_linha_receita").insert(paraLinha.slice(i, i + 500));
+        if (error) throw new Error(`inserir ca_linha_receita: ${error.message}`);
+      }
+      r.paraLinha = paraLinha.length;
+    }
+  }
+
   const inserir = async (tabela: string, linhas: Record<string, unknown>[]) => {
     for (let i = 0; i < linhas.length; i += 500) {
       const { error } = await supabaseAdmin.from(tabela).insert(linhas.slice(i, i + 500));
@@ -354,4 +435,33 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
   r.paraDireto = paraDireto.length;
   r.paraGrupo = paraGrupo.length;
   return r;
+}
+
+/**
+ * A categoria que cada ITEM mais teve em vendas que TEM categoria.
+ *
+ * Venda que nasce no site chega sem categoria; o item, porem, costuma estar
+ * categorizado em milhares de outras vendas. Cache de 1h: o historico mexe
+ * pouco e a leitura e de todas as vendas.
+ */
+let cacheCategoriaItem: { em: number; mapa: Map<string, string> } | null = null;
+async function categoriaDominantePorItem(): Promise<Map<string, string>> {
+  if (cacheCategoriaItem && Date.now() - cacheCategoriaItem.em < 3_600_000) return cacheCategoriaItem.mapa;
+  const vendas = await lerTudo<{ ca_id: string; categoria_ca_id: string | null }>("ca_vendas", "ca_id, categoria_ca_id", {
+    filtrar: (q) => (q as never as { not: Function }).not("categoria_ca_id", "is", null),
+  });
+  const catDaVenda = new Map(vendas.map((v) => [v.ca_id, v.categoria_ca_id as string]));
+  const itens = await lerTudo<{ venda_ca_id: string; item_ca_id: string | null }>("ca_venda_itens", "ca_id, venda_ca_id, item_ca_id");
+  const cont = new Map<string, Map<string, number>>();
+  for (const it of itens) {
+    const cat = catDaVenda.get(it.venda_ca_id);
+    if (!cat || !it.item_ca_id) continue;
+    const m = cont.get(it.item_ca_id) ?? new Map<string, number>();
+    m.set(cat, (m.get(cat) ?? 0) + 1);
+    cont.set(it.item_ca_id, m);
+  }
+  const mapa = new Map<string, string>();
+  for (const [item, m] of cont) mapa.set(item, [...m].sort((a, b) => b[1] - a[1])[0][0]);
+  cacheCategoriaItem = { em: Date.now(), mapa };
+  return mapa;
 }

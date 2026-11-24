@@ -73,7 +73,8 @@ export default function MapaClient({
   sellers: { id: string; name: string; bu: string }[];
 }) {
   const [aba, setAba] = useState<"categorias" | "itens" | "vendedores">("categorias");
-  const pendentesCat = categorias.filter((c) => !c.product_line && !c.ignorar).length;
+  // Categoria classificada = tem BU (ou foi ignorada). A linha de receita E a propria categoria.
+  const pendentesCat = categorias.filter((c) => !c.bu && !c.ignorar).length;
   /**
    * Só conta como pendente o item que MUDA alguma coisa — os que aparecem em
    * venda sem categoria. A primeira versão desta tela anunciava "109 pendentes"
@@ -85,7 +86,7 @@ export default function MapaClient({
 
   const abas = [
     { id: "categorias" as const, label: "Categorias", n: pendentesCat, total: categorias.length },
-    { id: "itens" as const, label: "Itens", n: pendentesItem, total: itens.filter((i) => i.relevante).length },
+    { id: "itens" as const, label: "Itens (avançado)", n: pendentesItem, total: itens.filter((i) => i.relevante).length },
     { id: "vendedores" as const, label: "Vendedores", n: pendentesVend, total: vendedores.length },
   ];
 
@@ -94,10 +95,12 @@ export default function MapaClient({
       <section className="panel p-4">
         <h2 className="eyebrow-label mb-2">Classificação</h2>
         <p className="mb-3 max-w-3xl text-xs leading-relaxed text-white/50">
-          A <strong>categoria</strong> da venda resolve quase tudo e é o que separa matrícula de
-          mensalidade. O <strong>item</strong> entra em dois casos: venda que nasce no site e chega
-          sem categoria nenhuma, e matrícula do Colégio, onde a série só aparece no nome do item.
-          Quando os dois existem, o item tem a palavra final.
+          A <strong>linha de receita é a categoria do Conta Azul</strong> — não há mais o que ligar a
+          uma linha do Hub. Em <strong>Categorias</strong> você só diz a <strong>BU</strong> e se a
+          categoria <strong>conta para o vendedor</strong> (matrícula conta; mensalidade, repasse,
+          fardamento e livros vão para a diretoria/grupo). Em <strong>Vendedores</strong> você diz se
+          o cadastro do Conta Azul é vendedor, canal direto ou grupo. <strong>Itens</strong> é
+          avançado: só serve ao dashboard antigo por linha.
         </p>
         <AplicarTudo pendentes={pendentesCat + pendentesItem + pendentesVend} />
 
@@ -234,7 +237,7 @@ function TabelaLinhas({ linhas, tipo }: { linhas: LinhaMapa[]; tipo: "categoria"
               <th scope="col" className="pb-2 text-left font-semibold">{tipo === "categoria" ? "Categoria" : "Item"}</th>
               <th scope="col" className="pb-2 text-right font-semibold">Movimentou</th>
               <th scope="col" className="pb-2 text-left font-semibold">BU</th>
-              <th scope="col" className="pb-2 text-left font-semibold">Linha de receita</th>
+              {tipo === "item" ? <th scope="col" className="pb-2 text-left font-semibold">Linha de receita</th> : null}
               <th scope="col" className="pb-2 text-center font-semibold">Conta p/ vendedor</th>
               <th scope="col" className="pb-2" />
             </tr>
@@ -259,18 +262,32 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
   const router = useRouter();
   const [salvando, startTransition] = useTransition();
   // Só sugere o que ainda não foi classificado — palpite nunca sobrescreve gente.
-  const jaFeito = !!linha.product_line || linha.ignorar;
+  const ehCat = linha.ca_tipo === "categoria";
+  const jaFeito = (ehCat ? !!linha.bu : !!linha.product_line) || linha.ignorar;
   const sug = jaFeito || linha.ca_tipo !== "categoria" ? null : palpitarCategoria(linha.ca_nome);
   const [bu, setBu] = useState(linha.bu ?? sug?.bu ?? "");
+  const buAtual = bu;
   const [pl, setPl] = useState(linha.product_line ?? sug?.product_line ?? "");
+  const plAtual = pl;
   const [conta, setConta] = useState(linha.conta_vendedor || (sug?.conta_vendedor ?? false));
+  const contaAtual = conta;
   const [ignorar, setIgnorar] = useState(linha.ignorar || (sug?.ignorar ?? false));
+  const ignorarAtual = ignorar;
   const [erro, setErro] = useState<string | null>(null);
 
-  const pendente = !linha.product_line && !linha.ignorar;
+  const pendente = !jaFeito;
+  const [salvo, setSalvo] = useState(false);
 
-  async function salvar() {
+  // Categoria salva SOZINHA ao mudar qualquer campo (BU, conta p/ vendedor, ignorar):
+  // antes era preciso achar o botao, e a linha continuava "pendente" por falta de
+  // uma linha de receita que a categoria nem precisa ter.
+  async function salvar(o?: { bu?: string; pl?: string; conta?: boolean; ignorar?: boolean }) {
     setErro(null);
+    setSalvo(false);
+    const bu = o?.bu ?? buAtual;
+    const pl = o?.pl ?? plAtual;
+    const conta = o?.conta ?? contaAtual;
+    const ignorar = o?.ignorar ?? ignorarAtual;
     const res = await fetch("/api/ca/mapa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -288,6 +305,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
       setErro(j.error ?? "Falhou.");
       return;
     }
+    setSalvo(true);
     startTransition(() => router.refresh());
   }
 
@@ -339,6 +357,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
           onChange={(e) => {
             setBu(e.target.value);
             setPl("");
+            if (ehCat) void salvar({ bu: e.target.value, pl: "" });
           }}
           disabled={ignorar}
         >
@@ -350,7 +369,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
           ))}
         </select>
       </td>
-      <td className="py-2 pr-3 align-top">
+      {ehCat ? null : <td className="py-2 pr-3 align-top">
         <select
           className="input !py-1 text-xs"
           value={pl}
@@ -368,12 +387,15 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
             </option>
           ))}
         </select>
-      </td>
+      </td>}
       <td className="py-2 pr-3 text-center align-top">
         <input
           type="checkbox"
           checked={conta}
-          onChange={(e) => setConta(e.target.checked)}
+          onChange={(e) => {
+            setConta(e.target.checked);
+            if (ehCat) void salvar({ conta: e.target.checked });
+          }}
           disabled={ignorar || LINHAS_GRUPO.has(pl)}
           aria-label="Conta para o vendedor"
         />
@@ -381,18 +403,31 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
       <td className="py-2 align-top">
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-[11px] text-white/50">
-            <input type="checkbox" checked={ignorar} onChange={(e) => setIgnorar(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={ignorar}
+              onChange={(e) => {
+                setIgnorar(e.target.checked);
+                if (ehCat) void salvar({ ignorar: e.target.checked });
+              }}
+            />
             ignorar
           </label>
-          <button
-            type="button"
-            onClick={salvar}
-            disabled={salvando}
-            title={sug ? "Salvar a sugestão" : "Salvar"}
-            className={`btn !px-2 !py-1 ${sug ? "btn-primary" : "btn-ghost"}`}
-          >
-            <Check className="h-3.5 w-3.5" />
-          </button>
+          {ehCat ? (
+            <span className="min-w-[4.5rem] text-[11px]" style={{ color: erro ? COLOR.danger : COLOR.ok }}>
+              {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void salvar()}
+              disabled={salvando}
+              title={sug ? "Salvar a sugestão" : "Salvar"}
+              className={`btn !px-2 !py-1 ${sug ? "btn-primary" : "btn-ghost"}`}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </td>
     </tr>
