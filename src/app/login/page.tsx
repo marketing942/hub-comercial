@@ -36,7 +36,7 @@ export default function LoginPage() {
             <Trophy className="w-5 h-5 text-accent" />
           </div>
           <div>
-            <div className="text-lg font-semibold">Hub Comercial</div>
+            <div className="text-lg font-semibold">Hub de Receita</div>
             <div className="text-xs text-white/50">Gestão</div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-# Hub Comercial Temporário
+# Hub de Receita
 
 Sistema interno de gestão de vendas das BUs **CPPEM** e **Unicive**.
 Painel gamificado com metas mensais, comparação meta × realizado em tempo real,

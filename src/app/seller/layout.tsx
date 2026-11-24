@@ -15,7 +15,6 @@ export default async function SellerLayout({ children }: { children: React.React
   const items: SidebarItem[] = [
     { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
     { href: "/seller", label: "Meu Painel", icon: "dashboard" },
-    { href: "/seller/sales", label: "Minhas Vendas", icon: "cart" },
     { href: "/seller/gamification", label: "Gamificacao", icon: "game" },
   ];
 

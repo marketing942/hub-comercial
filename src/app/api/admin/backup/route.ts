@@ -110,7 +110,7 @@ export async function GET(req: Request) {
 
   // ====== Monta o XLSX ======
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Hub Comercial CPPEM";
+  wb.creator = "Hub de Receita CPPEM";
   wb.created = new Date();
 
   const monthLabel = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", {

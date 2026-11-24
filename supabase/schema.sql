@@ -1,4 +1,4 @@
--- Estrutura real do banco do Hub Comercial (gerada do banco em producao em 06/10/2026).
+-- Estrutura real do banco do Hub de Receita (gerada do banco em producao em 06/10/2026).
 -- Rode no SQL Editor de um projeto Supabase vazio. Os dados nao estao aqui.
 
 create extension if not exists pgcrypto;

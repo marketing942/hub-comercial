@@ -8,8 +8,8 @@ const oxanium = Oxanium({ variable: "--font-display", subsets: ["latin"] });
 const rajdhani = Rajdhani({ variable: "--font-ui", subsets: ["latin"], weight: ["500", "600", "700"] });
 
 export const metadata: Metadata = {
-  title: "Hub Comercial",
-  description: "Hub temporario do comercial - metas, resultados e gamificacao.",
+  title: "Hub de Receita",
+  description: "Hub de Receita - metas, resultados e gamificacao.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

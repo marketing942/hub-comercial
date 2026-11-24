@@ -1,5 +1,5 @@
 -- =====================================================================
--- Hub Comercial - Habilitar Row Level Security (defesa em profundidade)
+-- Hub de Receita - Habilitar Row Level Security (defesa em profundidade)
 -- Rodar UMA VEZ no SQL Editor do Supabase.
 --
 -- Modelo de acesso: TODO acesso ao banco passa pelas rotas /api do Next,

@@ -47,7 +47,7 @@ export default function Sidebar({
           href={role === "admin" ? "/admin" : "/dashboard"}
           className="font-display font-bold tracking-[0.14em] text-[15px] uppercase whitespace-nowrap"
         >
-          Hub <span className="text-accent">Comercial</span>
+          Hub de <span className="text-accent">Receita</span>
         </Link>
 
         <nav className="hidden md:flex items-stretch gap-1 h-full">
