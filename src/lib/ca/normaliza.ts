@@ -31,6 +31,7 @@ import { situacaoConta } from "./config";
 import { lerPorChaves, lerTudo } from "./ler";
 import { LINHAS_VENDEDOR, linhaValida } from "./linhas";
 import { palpitarCategoria } from "./sugestao";
+import { nomeDoCA } from "./nomes";
 
 type Destino = "vendedor" | "canal_direto" | "grupo" | "pendente";
 
@@ -145,9 +146,22 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
 
   const vendRaw = await lerTudo<Record<string, unknown>>(
     "ca_vendedores",
-    "ca_vendedor_id, destino, seller_id",
+    "ca_vendedor_id, ca_nome, destino, seller_id",
     { ordenarPor: "ca_vendedor_id" },
   );
+  // O nome do vendedor do Hub e o do Conta Azul: acompanha qualquer mudanca de la.
+  try {
+    const atuais = new Map((await listSellers()).map((x) => [x.id, x.name]));
+    for (const v of vendRaw) {
+      if (v.destino !== "vendedor" || !v.seller_id) continue;
+      const nome = nomeDoCA(v.ca_nome as string | null);
+      if (nome && atuais.get(v.seller_id as string) !== nome) {
+        await supabaseAdmin.from("sellers").update({ name: nome }).eq("id", v.seller_id as string);
+      }
+    }
+  } catch (e) {
+    console.error("sincronizar nomes dos vendedores falhou:", (e as Error).message);
+  }
   const mapaVendedor = new Map<string, { destino: Destino; seller_id: string | null }>();
   for (const v of vendRaw)
     mapaVendedor.set(v.ca_vendedor_id as string, {

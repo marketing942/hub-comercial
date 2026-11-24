@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { nomeDoCA } from "@/lib/ca/nomes";
 
 const DESTINOS = new Set(["vendedor", "canal_direto", "grupo", "pendente"]);
 
@@ -25,5 +26,11 @@ export async function POST(req: NextRequest) {
     .update({ destino: b.destino, seller_id: b.destino === "vendedor" ? b.seller_id : null })
     .eq("ca_vendedor_id", b.ca_vendedor_id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Ligou a um vendedor do Hub: o nome dele passa a ser o do Conta Azul.
+  if (b.destino === "vendedor" && b.seller_id) {
+    const { data: ca } = await supabaseAdmin.from("ca_vendedores").select("ca_nome").eq("ca_vendedor_id", b.ca_vendedor_id).maybeSingle();
+    const nome = nomeDoCA((ca as { ca_nome?: string | null } | null)?.ca_nome);
+    if (nome) await supabaseAdmin.from("sellers").update({ name: nome }).eq("id", b.seller_id);
+  }
   return NextResponse.json({ ok: true });
 }

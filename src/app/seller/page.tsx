@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { getSeller, statsForSellerInBu, sellerSeries, sellerProductBreakdown, buListOf } from "@/lib/data";
+import { getSeller, statsForSellerInBu, sellerSeries, buListOf } from "@/lib/data";
 import {
   BRL,
   businessDaysElapsed,
@@ -16,7 +16,6 @@ import { isQtdPrimary, type BU } from "@/lib/products";
 import BULogo from "@/components/BULogo";
 import Cell from "@/components/StatCell";
 import ProgressBar from "@/components/ProgressBar";
-import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import AvatarUploader from "@/components/AvatarUploader";
 import ChangePasswordButton from "@/components/ChangePasswordButton";
@@ -45,7 +44,6 @@ export default async function MyPanel({
   const series = await sellerSeries(seller, bu, stats.metaTotal, { year, month });
   // Mesma leitura do painel das BUs, recortada neste vendedor: cada categoria
   // abre nas vendas DELE que formaram aquele faturado.
-  const categorias = await sellerProductBreakdown(seller, bu, { year, month });
   const isQtd = isQtdPrimary(bu);
   const color = BU_COLOR[bu];
   const fmtMeta = (n: number) => (isQtd ? fmtInt.format(Math.round(n)) : BRL.format(n));
@@ -259,12 +257,6 @@ export default async function MyPanel({
           </div>
         </section>
 
-        <ProductRevenueBreakdown
-          rows={categorias}
-          subtitulo="Minhas vendas por categoria — clique para ver cada uma"
-          // Todas as vendas desta lista são dele: a coluna repetiria o nome.
-          mostrarVendedor={false}
-        />
       </div>
     </div>
   );

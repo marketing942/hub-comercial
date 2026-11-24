@@ -49,11 +49,22 @@ type Linha = {
 
 const BUS_VALIDAS = new Set<string>(["cppem", "unicive", "colegio_cppem"]);
 
-async function calcular(year: number, mes: number): Promise<GestaoMes> {
-  const mm = String(mes).padStart(2, "0");
+const MES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/**
+ * `mes` = um mes (barras por DIA) ou `null` = o ano inteiro (barras por MES).
+ * Mesmo agregador nos dois: so muda o intervalo e o tamanho do balde.
+ */
+async function calcular(year: number, mes: number | null): Promise<GestaoMes> {
+  const anual = mes === null;
+  const mm = anual ? "01" : String(mes).padStart(2, "0");
   const de = `${year}-${mm}-01`;
-  const prox = mes === 12 ? `${year + 1}-01-01` : `${year}-${String(mes + 1).padStart(2, "0")}-01`;
-  const totalDias = new Date(year, mes, 0).getDate();
+  const prox = anual
+    ? `${year + 1}-01-01`
+    : mes === 12
+      ? `${year + 1}-01-01`
+      : `${year}-${String(mes + 1).padStart(2, "0")}-01`;
+  const totalDias = anual ? 12 : new Date(year, mes, 0).getDate();
 
   let semTabela = false;
   const [linhas, metas, sync, conferencia] = await Promise.all([
@@ -80,7 +91,9 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
       // Metas por linha (etapa 2): somadas por categoria; sem a tabela, sem metas.
       const m = new Map<string, number>();
       try {
-        const { data } = await supabaseAdmin.from("ca_metas_linha").select("categoria_id, valor_meta").eq("year", year).eq("month", mes);
+        let q = supabaseAdmin.from("ca_metas_linha").select("categoria_id, valor_meta").eq("year", year);
+        if (!anual) q = q.eq("month", mes);
+        const { data } = await q;
         for (const r of (data as { categoria_id: string; valor_meta: number }[]) ?? []) {
           m.set(r.categoria_id, (m.get(r.categoria_id) ?? 0) + Number(r.valor_meta ?? 0));
         }
@@ -118,7 +131,8 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
 
   const dias: DiaGestao[] = Array.from({ length: totalDias }, (_, i) => ({
     dia: i + 1,
-    data: `${year}-${mm}-${String(i + 1).padStart(2, "0")}`,
+    rotulo: anual ? MES_ABREV[i] : undefined,
+    data: anual ? `${year}-${String(i + 1).padStart(2, "0")}` : `${year}-${mm}-${String(i + 1).padStart(2, "0")}`,
     total: 0,
     origem: vazioOrigem(),
     bu: vazioBu(),
@@ -134,7 +148,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
     const bu: BuKey = l.bu && BUS_VALIDAS.has(l.bu) ? (l.bu as BuKey) : "grupo";
     // A categoria e a do Conta Azul; o nome identifica (o id pode faltar).
     const chave = l.categoria_id ?? `nome:${l.categoria_nome}`;
-    const d = Number(l.sale_date.slice(8, 10));
+    const d = Number(l.sale_date.slice(anual ? 5 : 8, anual ? 7 : 10));
     if (d >= 1 && d <= totalDias) {
       const dia = dias[d - 1];
       dia.total += v;
@@ -155,8 +169,8 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
 
   // Acumulado: para no dia de hoje se o mes e o corrente (dia futuro nao tem dado).
   const hoje = nowRecife();
-  const ehCorrente = hoje.getFullYear() === year && hoje.getMonth() + 1 === mes;
-  const ate = ehCorrente ? hoje.getDate() : totalDias;
+  const ehCorrente = anual ? hoje.getFullYear() === year : hoje.getFullYear() === year && hoje.getMonth() + 1 === mes;
+  const ate = !ehCorrente ? totalDias : anual ? hoje.getMonth() + 1 : hoje.getDate();
   let corrente = 0;
   for (const d of dias) {
     corrente += d.total;
@@ -166,6 +180,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
   return {
     year,
     mes,
+    anual,
     total: porOrigem.vendedores + porOrigem.direto + porOrigem.diretoria,
     porOrigem,
     semDono,
@@ -182,12 +197,14 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
  * junto com o resto do dashboard (`DASHBOARD_TAG`); mes fechado quase nao muda e
  * fica fora da tag, para a venda de hoje nao jogar fora o cache dele.
  */
-export function gestaoDoMes(year: number, mes: number): Promise<GestaoMes> {
+export function gestaoDoMes(year: number, mes: number | null): Promise<GestaoMes> {
   const hoje = nowRecife();
-  const ehCorrente = year > hoje.getFullYear() || (year === hoje.getFullYear() && mes >= hoje.getMonth() + 1);
+  const ehCorrente =
+    year > hoje.getFullYear() ||
+    (year === hoje.getFullYear() && (mes === null || mes >= hoje.getMonth() + 1));
   return unstable_cache(
     () => calcular(year, mes),
-    [`gestao-a-vista-v4-${year}-${mes}`],
+    [`gestao-a-vista-v5-${year}-${mes ?? "ano"}`],
     ehCorrente ? { revalidate: 600, tags: [DASHBOARD_TAG] } : { revalidate: 3600 },
   )();
 }

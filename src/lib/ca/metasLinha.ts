@@ -137,6 +137,7 @@ export async function montarMetasLinha(bu: BU, year: number, month: number) {
   const categorias: CategoriaMeta[] = cats.map((c) => ({
     id: c.id,
     nome: c.nome,
+    conta: c.conta,
     realizado: real.get(c.id)?.valor ?? 0,
     qtd: real.get(c.id)?.qtd ?? 0,
     meta_valor: gravadas?.get(c.id)?.valor ?? 0,

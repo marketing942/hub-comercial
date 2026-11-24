@@ -50,6 +50,8 @@ export const PALETA_CATEGORIAS = [
 
 export type DiaGestao = {
   dia: number;
+  /** Visao anual: nome do mes ("Jan"...); na mensal, vazio. */
+  rotulo?: string;
   data: string;
   total: number;
   origem: Record<Origem, number>;
@@ -72,7 +74,9 @@ export type LinhaCategoria = {
 
 export type GestaoMes = {
   year: number;
-  mes: number;
+  /** Mes (1-12) ou `null` na visao anual. */
+  mes: number | null;
+  anual: boolean;
   /** Faturamento da empresa no mes (todas as linhas do Conta Azul). */
   total: number;
   porOrigem: Record<Origem, number>;

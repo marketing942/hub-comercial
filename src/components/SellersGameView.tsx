@@ -1,9 +1,7 @@
 import type { SellerStats } from "@/lib/calc";
-import type { LigacaoRow, IndicacaoRow } from "@/lib/data";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
 import { BU_COLOR, BU_LABEL, COLOR, PANICO_BADGE } from "@/lib/brand";
 import { isQtdPrimary, ALL_BUS, LIGACAO_STATUSES, INDICACAO_STATUSES, type BU } from "@/lib/products";
-import OriginDonut from "@/components/OriginDonutLazy";
 import ProgressBar from "@/components/ProgressBar";
 import Avatar from "@/components/Avatar";
 import { Crown } from "lucide-react";
@@ -33,16 +31,12 @@ export default function SellersGameView({
   day,
   totalDays,
   daysLeft,
-  ligacao,
-  indicacao,
 }: {
   stats: SellerStats[];
   monthName: string;
   day: number;
   totalDays: number;
   daysLeft: number;
-  ligacao?: LigacaoRow[];
-  indicacao?: IndicacaoRow[];
 }) {
   const sortByReal = (a: SellerStats, b: SellerStats) => b.realizado - a.realizado;
 
@@ -96,28 +90,6 @@ export default function SellersGameView({
       {ALL_BUS.map((bu) => (
         <BUGroup key={bu} bu={bu} sellers={ranks[bu]} accent={BU_COLOR[bu]} />
       ))}
-
-      {/* Ultima secao: origem das vendas (Onvox e Indicacao), agregado de todas as BUs */}
-      {(ligacao || indicacao) && (
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {ligacao && (
-            <OriginDonut
-              rows={ligacao}
-              statuses={LIGACAO_STATUSES}
-              title="Origem por Onvox — Geral"
-              subtitle="A ligacao Onvox influenciou a venda? (todas as BUs)"
-            />
-          )}
-          {indicacao && (
-            <OriginDonut
-              rows={indicacao}
-              statuses={INDICACAO_STATUSES}
-              title="Origem por Indicacao — Geral"
-              subtitle="A venda veio de indicacao? (todas as BUs)"
-            />
-          )}
-        </section>
-      )}
     </div>
   );
 }

@@ -19,69 +19,95 @@ export const dynamic = "force-dynamic";
 export default async function GestaoPage({
   searchParams,
 }: {
-  searchParams: { year?: string; mes?: string };
+  searchParams: { year?: string; mes?: string; modo?: string };
 }) {
   const agora = periodNow();
   const y = Number(searchParams.year);
   const year = Number.isInteger(y) && y >= YEAR_MIN && y <= YEAR_MAX ? y : agora.year;
+  const anual = searchParams.modo === "anual";
   const m = Number(searchParams.mes);
   const mes = Number.isInteger(m) && m >= 1 && m <= 12 ? m : year === agora.year ? agora.month : 12;
 
-  const dados = await gestaoDoMes(year, mes);
+  const dados = await gestaoDoMes(year, anual ? null : mes);
   const anos: number[] = [];
   for (let a = agora.year; a >= Math.max(YEAR_MIN, agora.year - 3); a--) anos.push(a);
 
   const origens: Origem[] = ["vendedores", "direto", "diretoria"];
   const pct = (v: number) => (dados.total > 0 ? fmtPct((v / dados.total) * 100) : "—");
+  // Cada combinacao e um endereco (da para compartilhar e voltar pelo navegador).
+  const href = (o: { modo?: "mensal" | "anual"; year?: number; mes?: number }) => {
+    const modo = o.modo ?? (anual ? "anual" : "mensal");
+    const yr = o.year ?? year;
+    const mm = o.mes ?? (yr === year ? mes : yr === agora.year ? agora.month : 12);
+    return `/admin/gav/gestao?modo=${modo}&year=${yr}${modo === "mensal" ? `&mes=${mm}` : ""}`;
+  };
+  const pilula = (ativo: boolean) =>
+    `shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+      ativo ? "bg-accent text-black" : "text-white/60 hover:text-white"
+    }`;
+  const grupo = "inline-flex items-center gap-0.5 rounded-xl border border-border bg-panel p-1";
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Gestão a Vista</h1>
           <p className="text-sm text-white/50">
-            Faturamento da empresa em {MES_NOME[mes - 1]} de {year}, todas as linhas de receita do Conta Azul.
+            Faturamento da empresa {anual ? `em ${year}, mês a mês` : `em ${MES_NOME[mes - 1]} de ${year}, dia a dia`} —
+            todas as linhas de receita do Conta Azul.
           </p>
         </div>
-        <div className="flex items-center gap-1">
-          <BotaoTelaCheia />
-          {anos.map((a) => (
-            <Link
-              key={a}
-              href={`/admin/gav/gestao?year=${a}&mes=${a === year ? mes : a === agora.year ? agora.month : 12}`}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                a === year ? "bg-accent text-black" : "text-white/60 hover:text-white"
-              }`}
-            >
-              {a}
-            </Link>
-          ))}
-        </div>
+        <BotaoTelaCheia />
       </div>
 
-      {/* Filtro de mes: links, cada mes e um endereco (da para compartilhar e voltar). */}
-      <nav className="no-scrollbar flex gap-1 overflow-x-auto" aria-label="Escolher o mes">
-        {MES_CURTO.map((nome, i) => {
-          const n = i + 1;
-          return (
-            <Link
-              key={nome}
-              href={`/admin/gav/gestao?year=${year}&mes=${n}`}
-              aria-current={n === mes ? "page" : undefined}
-              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                n === mes ? "bg-accent text-black" : "text-white/60 hover:text-white"
-              }`}
-            >
-              {nome}
+      {/* Filtros numa barra so: visao (mensal/anual), ano e, no mensal, o mes. */}
+      <section className="panel flex flex-wrap items-center gap-x-5 gap-y-3 p-3">
+        <div className="flex items-center gap-2">
+          <span className="kpi-label">Visão</span>
+          <div className={grupo} role="tablist" aria-label="Visão">
+            <Link href={href({ modo: "mensal" })} role="tab" aria-selected={!anual} className={pilula(!anual)}>
+              Mensal
             </Link>
-          );
-        })}
-      </nav>
+            <Link href={href({ modo: "anual" })} role="tab" aria-selected={anual} className={pilula(anual)}>
+              Anual
+            </Link>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="kpi-label">Ano</span>
+          <div className={grupo}>
+            {anos.map((a) => (
+              <Link key={a} href={href({ year: a })} aria-current={a === year ? "page" : undefined} className={pilula(a === year)}>
+                {a}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {!anual && (
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="kpi-label">Mês</span>
+            <nav className={`${grupo} no-scrollbar max-w-full overflow-x-auto`} aria-label="Escolher o mês">
+              {MES_CURTO.map((nome, i) => (
+                <Link
+                  key={nome}
+                  href={href({ mes: i + 1 })}
+                  aria-current={i + 1 === mes ? "page" : undefined}
+                  className={pilula(i + 1 === mes)}
+                >
+                  {nome}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        )}
+      </section>
 
       {/* Quem trouxe a receita: vendedores, direto e diretoria. */}
       <section className="panel overflow-hidden">
         <div className="-ml-px -mt-px grid grid-cols-2 md:grid-cols-4">
-          <Cell label={`Total ${MES_CURTO[mes - 1]}/${year}`} value={BRL.format(dados.total)}>
+          <Cell label={anual ? `Total ${year}` : `Total ${MES_CURTO[mes - 1]}/${year}`} value={BRL.format(dados.total)}>
             Todas as linhas de receita
           </Cell>
           {origens.map((o) => (
@@ -106,7 +132,7 @@ export default async function GestaoPage({
             style={{ borderColor: ok ? undefined : "rgba(240,180,76,0.45)", color: ok ? "#5fd08f" : "#f0b44c" }}
           >
             {ok ? (
-              <>Conferido: o total desta tela bate com as vendas do Conta Azul no mês ({BRL.format(dados.conferencia.caTotal)}).</>
+              <>Conferido: o total desta tela bate com as vendas do Conta Azul no período ({BRL.format(dados.conferencia.caTotal)}).</>
             ) : (
               <>
                 Conta Azul (vendas faturadas/aprovadas): <b>{BRL.format(dados.conferencia.caTotal)}</b> · esta tela:{" "}
@@ -130,7 +156,7 @@ export default async function GestaoPage({
         </div>
       ) : null}
 
-      <GestaoGrafico dias={dados.dias} categorias={dados.categorias} />
+      <GestaoGrafico dias={dados.dias} categorias={dados.categorias} anual={anual} />
 
       <GestaoCategorias dados={dados} />
 

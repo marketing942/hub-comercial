@@ -13,7 +13,11 @@ type Seller = {
   active: boolean;
   avatar_color: string;
   has_password?: boolean;
+  /** O nome vem do cadastro do Conta Azul ligado a este vendedor. */
+  ligadoAoCA?: boolean;
 };
+
+type CaDisponivel = { id: string; nome: string; destino: string };
 
 function busOf(s: Seller): BU[] {
   const arr = Array.isArray(s.bus)
@@ -25,10 +29,12 @@ function busOf(s: Seller): BU[] {
 type StatusFilter = "all" | "active" | "inactive";
 type BuFilter = "all" | BU;
 
-export default function SellersClient({ initial }: { initial: Seller[] }) {
+export default function SellersClient({ initial, caDisponiveis }: { initial: Seller[]; caDisponiveis: CaDisponivel[] }) {
   const router = useRouter();
   const [list, setList] = useState(initial);
-  const [name, setName] = useState("");
+  const [caId, setCaId] = useState("");
+  const [disponiveis, setDisponiveis] = useState(caDisponiveis);
+  const [erroAdd, setErroAdd] = useState<string | null>(null);
   const [bus, setBus] = useState<BU[]>(["cppem"]);
   const [busy, setBusy] = useState(false);
 
@@ -45,19 +51,23 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
   }
 
   async function add() {
-    if (!name.trim() || bus.length === 0) return;
+    if (!caId || bus.length === 0) return;
     setBusy(true);
+    setErroAdd(null);
     const r = await fetch("/api/sellers", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), bus, bu: bus[0] }),
+      body: JSON.stringify({ ca_vendedor_id: caId, bus, bu: bus[0] }),
     });
     setBusy(false);
     if (r.ok) {
       const { data } = await r.json();
-      setList((l) => [...l, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setName("");
+      setList((l) => [...l, { ...data, ligadoAoCA: true }].sort((a, b) => a.name.localeCompare(b.name)));
+      setDisponiveis((d) => d.filter((x) => x.id !== caId));
+      setCaId("");
       router.refresh();
+    } else {
+      setErroAdd((await r.json().catch(() => ({}))).error || "Nao foi possivel adicionar.");
     }
   }
 
@@ -68,16 +78,6 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
       body: JSON.stringify({ active: !s.active }),
     });
     setList((l) => l.map((x) => (x.id === s.id ? { ...x, active: !x.active } : x)));
-    router.refresh();
-  }
-
-  async function rename(s: Seller, newName: string) {
-    await fetch(`/api/sellers/${s.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: newName }),
-    });
-    setList((l) => l.map((x) => (x.id === s.id ? { ...x, name: newName } : x)));
     router.refresh();
   }
 
@@ -119,13 +119,16 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
       <div className="card">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
           <div>
-            <label className="label">Nome do vendedor</label>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Joana Silva"
-            />
+            <label className="label">Vendedor do Conta Azul</label>
+            <select className="input" value={caId} onChange={(e) => setCaId(e.target.value)}>
+              <option value="">{disponiveis.length ? "Escolha quem adicionar…" : "Todos os vendedores do Conta Azul já foram adicionados"}</option>
+              {disponiveis.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nome}
+                </option>
+              ))}
+            </select>
+            {erroAdd && <p className="mt-1 text-xs text-danger">{erroAdd}</p>}
           </div>
           <div>
             <label className="label">BU(s)</label>
@@ -152,7 +155,7 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
           <button
             className="btn-primary"
             onClick={add}
-            disabled={busy || !name.trim() || bus.length === 0}
+            disabled={busy || !caId || bus.length === 0}
           >
             <Plus className="w-4 h-4" /> Adicionar
           </button>
@@ -235,15 +238,10 @@ export default function SellersClient({ initial }: { initial: Seller[] }) {
                 return (
                   <tr key={s.id} className="border-t border-border hover:bg-panel2/30">
                     <td data-label="Nome" className="p-3">
-                      <input
-                        defaultValue={s.name}
-                        onBlur={(e) =>
-                          e.target.value.trim() &&
-                          e.target.value !== s.name &&
-                          rename(s, e.target.value.trim())
-                        }
-                        className="bg-transparent border-b border-transparent hover:border-border focus:border-accent focus:outline-none font-medium w-full max-w-[260px]"
-                      />
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-[10px] uppercase tracking-wider" style={{ color: s.ligadoAoCA ? "#87847a" : "#f0b44c" }}>
+                        {s.ligadoAoCA ? "nome do Conta Azul" : "sem vínculo com o Conta Azul"}
+                      </div>
                     </td>
                     <td data-label="Atua em" className="p-3">
                       <div className="flex gap-1.5 flex-wrap">

@@ -182,12 +182,6 @@ export default function DashboardCarousel({
           ) : null
         )}
       </div>
-
-      <div className="text-center text-[11px] text-white/30">
-        {slides.length > 1
-          ? `Rotaciona entre ${slides.map((s) => s.label).join(" e ")} a cada ${intervalSec}s. Dados atualizam a cada ${Math.round(refreshMs / 1000)}s.`
-          : `Atualiza sozinho a cada ${Math.round(refreshMs / 1000)}s.`}
-      </div>
     </div>
   );
 }

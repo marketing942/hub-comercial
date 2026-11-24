@@ -27,8 +27,6 @@ import {
   daysRemainingIncludingToday,
   directSnapshot,
   getSeller,
-  indicacaoBreakdown,
-  ligacaoBreakdown,
   statsForAll,
   todayDayOfMonth,
 } from "@/lib/data";
@@ -42,7 +40,7 @@ const DASHBOARD_CACHE_SECONDS = 120;
 /**
  * Cache de servidor COMPARTILHADO entre abas e TVs.
  *
- * ⚠️ `fonte` entra na chave (`dashboard-data-v4-${fonte}`) **e** nos argumentos.
+ * ⚠️ `fonte` entra na chave (`dashboard-data-v5-${fonte}`) **e** nos argumentos.
  * Sem isso, o dashboard normal e o GAV serviriam um o cache do outro — e, como
  * este cache é de servidor, o erro atravessaria usuários e telas, não só a
  * requisição. Seria o GAV exibindo número manual rotulado como Conta Azul, que é
@@ -52,15 +50,13 @@ const carregar = (fonte: Fonte) =>
   unstable_cache(
     async (year: number, month: number) => {
       const stats = await statsForAll({ year, month, fonte });
-      const [snaps, direct, ligacaoAll, indicacaoAll] = await Promise.all([
+      const [snaps, direct] = await Promise.all([
         Promise.all(ALL_BUS.map((bu) => dashboardSnapshot(bu, { year, month, fonte }, stats))),
         directSnapshot({ year, month, fonte }),
-        ligacaoBreakdown({ year, month, fonte }),
-        indicacaoBreakdown({ year, month, fonte }),
       ]);
-      return { snaps, direct, ligacaoAll, indicacaoAll };
+      return { snaps, direct };
     },
-    [`dashboard-data-v4-${fonte}`],
+    [`dashboard-data-v5-${fonte}`],
     { revalidate: DASHBOARD_CACHE_SECONDS, tags: [DASHBOARD_TAG] },
   );
 
@@ -81,7 +77,7 @@ export default async function PainelDashboard({
     year: "numeric",
   });
 
-  const { snaps, direct, ligacaoAll, indicacaoAll } = await carregar(fonte)(year, month);
+  const { snaps, direct } = await carregar(fonte)(year, month);
   const allSellers = snaps.flatMap((s) => s.sellers);
 
   // Filtra os slides por role: vendedor so ve as BUs em que atua e o slide de
@@ -140,8 +136,6 @@ export default async function PainelDashboard({
           day={day}
           totalDays={totalDays}
           daysLeft={daysLeft}
-          ligacao={isAdmin ? ligacaoAll : undefined}
-          indicacao={isAdmin ? indicacaoAll : undefined}
         />
       ),
     },

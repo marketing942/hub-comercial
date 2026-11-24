@@ -54,11 +54,13 @@ function Dica({
   payload,
   label,
   series,
+  rotulos,
 }: {
   active?: boolean;
   payload?: { payload: Linha }[];
   label?: number;
   series: Serie[];
+  rotulos: (string | undefined)[];
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
@@ -80,7 +82,7 @@ function Dica({
       }}
     >
       <div style={{ color: COLOR.gold, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", fontSize: 11 }}>
-        Dia {label}
+        {rotulos[(label ?? 1) - 1] ?? `Dia ${label}`}
       </div>
       {itens.map((s) => (
         <div key={s.key} style={{ display: "flex", justifyContent: "space-between", gap: 14, marginTop: 4 }}>
@@ -105,8 +107,18 @@ function Dica({
   );
 }
 
-export default function GestaoGrafico({ dias, categorias }: { dias: DiaGestao[]; categorias: LinhaCategoria[] }) {
+export default function GestaoGrafico({
+  dias,
+  categorias,
+  anual = false,
+}: {
+  dias: DiaGestao[];
+  categorias: LinhaCategoria[];
+  /** Visao do ano: uma barra por mes (rotulos "Jan"...). */
+  anual?: boolean;
+}) {
   const [visao, setVisao] = useState<Visao>("origem");
+  const rotulos = useMemo(() => dias.map((d) => d.rotulo), [dias]);
 
   const { series, linhas } = useMemo(() => {
     let series: Serie[] = [];
@@ -151,9 +163,9 @@ export default function GestaoGrafico({ dias, categorias }: { dias: DiaGestao[];
     <section className="panel p-5">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="eyebrow-label">Faturamento dia a dia</div>
+          <div className="eyebrow-label">{anual ? "Faturamento mês a mês" : "Faturamento dia a dia"}</div>
           <div className="mt-1 text-xs text-white/45">
-            Receita de cada dia, quebrada {visao === "origem" ? "por origem" : visao === "bu" ? "por BU" : "por categoria de receita"}, e o acumulado do mês.
+            Receita de cada {anual ? "mês" : "dia"}, quebrada {visao === "origem" ? "por origem" : visao === "bu" ? "por BU" : "por categoria de receita"}, e o acumulado do {anual ? "ano" : "mês"}.
           </div>
         </div>
         {/* Escolhe a visao do grafico. */}
@@ -183,7 +195,7 @@ export default function GestaoGrafico({ dias, categorias }: { dias: DiaGestao[];
         ))}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
           <i style={{ width: 16, height: 0, borderTop: `2px solid ${COLOR.neutral}`, display: "inline-block" }} />
-          Acumulado do mês
+          Acumulado do {anual ? "ano" : "mês"}
         </span>
       </div>
 
@@ -191,10 +203,10 @@ export default function GestaoGrafico({ dias, categorias }: { dias: DiaGestao[];
         <ResponsiveContainer>
           <ComposedChart data={linhas} margin={{ top: 12, left: 0, right: 8, bottom: 4 }} barCategoryGap="20%">
             <CartesianGrid stroke="#2d2c3a" strokeDasharray="3 5" vertical={false} />
-            <XAxis dataKey="dia" stroke="#87847a" fontSize={11} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={14} />
+            <XAxis dataKey="dia" stroke="#87847a" fontSize={11} tickLine={false} axisLine={false} interval={anual ? 0 : "preserveStartEnd"} minTickGap={14} tickFormatter={(v: number) => rotulos[v - 1] ?? String(v)} />
             <YAxis yAxisId="dia" stroke="#87847a" fontSize={11} tickLine={false} axisLine={false} tickFormatter={compacto} width={60} />
             <YAxis yAxisId="acum" orientation="right" stroke="#87847a" fontSize={11} tickLine={false} axisLine={false} tickFormatter={compacto} width={60} />
-            <Tooltip cursor={{ fill: "rgba(201,174,122,0.06)" }} content={<Dica series={series} />} />
+            <Tooltip cursor={{ fill: "rgba(201,174,122,0.06)" }} content={<Dica series={series} rotulos={rotulos} />} />
             {series.map((s, i) => (
               <Bar
                 key={s.key}

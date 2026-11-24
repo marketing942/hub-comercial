@@ -19,7 +19,7 @@ export default async function GoalsPage() {
       <div>
         <h1 className="text-2xl font-bold">Metas do mes</h1>
         <p className="text-sm text-white/50">
-          1 - Escolha a BU. 2 - Defina a meta geral da BU. 3 - Distribua entre os vendedores. 4 - Salva tudo de uma vez.
+          Escolha a BU e o mês. Três níveis, nesta ordem: meta total da BU, meta por linha de receita e meta por vendedor. Um botão salva tudo.
         </p>
       </div>
       <GoalsClient sellers={sellers} defaultYear={year} defaultMonth={month} />

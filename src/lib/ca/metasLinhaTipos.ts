@@ -2,6 +2,8 @@
 export type CategoriaMeta = {
   id: string;
   nome: string;
+  /** Conta para o vendedor (entra na meta total da BU); senao so aparece na Gestao a Vista. */
+  conta: boolean;
   /** Receita do mes nessa categoria (todas as origens). */
   realizado: number;
   qtd: number;
