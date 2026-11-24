@@ -135,3 +135,8 @@ Raios: cartões `2xl`/18px · botões e inputs `lg` · contêineres de pílulas 
 
 - O **nome** do vendedor é o do Conta Azul (`ca_vendedores.ca_nome`, em Title Case se vier em caixa alta — `src/lib/ca/nomes.ts`). Não se digita nome: em Configurações → Vendedores escolhe-se o cadastro do CA e as BUs (`POST /api/sellers` recebe `ca_vendedor_id`, cria o vendedor e liga `ca_vendedores.seller_id`). A normalização (`normalizarJanela`) e a ligação em Classificação → Vendedores sincronizam o nome de quem já está ligado. Vendedor sem vínculo mostra o aviso “sem vínculo com o Conta Azul”. Status, senha e BUs continuam do Hub.
 - Dashboard: sem a frase de rotação no rodapé; o slide Vendedores não mostra mais os donuts de origem Onvox/Indicação; o Meu Painel não tem o card de receita por categoria. A Gestão a Vista tem visão **Mensal** (dia a dia) e **Anual** (mês a mês) na barra de filtros.
+
+## 11. Classificação: salva sozinha e lê o espelho uma vez
+
+- **Tudo salva ao mudar** (Categorias, Itens e Vendedores): não há botão de check; a linha mostra “Salvando… / Salvo ✓”. Vendedor com destino “Vendedor” só grava depois de escolher quem (senão a venda sumiria do ranking).
+- **Desempenho**: `src/lib/ca/mapa.ts` lê `ca_vendas` e `ca_venda_itens` **uma vez**, em paralelo, e agrega tudo numa passada (`agregarEspelho`, `unstable_cache` 5 min, tag `ca-espelho`, invalidada por `gravarEspelho` a cada sync). A classificação é aplicada em memória por cima (antes eram 4 leituras de `ca_vendas` e 3 de itens, em série, a cada abertura e a cada salvar). Só entra no agregado o que **não** depende da classificação.

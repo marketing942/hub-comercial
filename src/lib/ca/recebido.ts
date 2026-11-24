@@ -13,7 +13,9 @@
  * invariante de nunca tocar linha manual.
  */
 import { supabaseAdmin } from "@/lib/supabase";
+import { revalidateTag } from "next/cache";
 import { lerTudo } from "./ler";
+import { TAG_ESPELHO } from "./mapa";
 
 export interface ResultadoEspelho {
   vendas: number;
@@ -184,6 +186,13 @@ export async function gravarEspelho(
       .from("ca_mapa_receita")
       .upsert(categorias.slice(i, i + 500), { onConflict: "ca_tipo,ca_id" });
     if (error) throw new Error(`nomes de categoria: ${error.message}`);
+  }
+
+  // O espelho mudou: o agregado da tela de Classificacao (em cache) fica velho.
+  try {
+    revalidateTag(TAG_ESPELHO);
+  } catch {
+    /* fora de rota: nada a invalidar */
   }
 
   return { vendas: vendas.length, itens: itens.length, categorias: categorias.length, orfaosRemovidos };

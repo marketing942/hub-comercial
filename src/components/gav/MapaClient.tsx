@@ -20,7 +20,7 @@
  */
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Check, Sparkles, Wand2 } from "lucide-react";
+import { Sparkles, Wand2 } from "lucide-react";
 
 import { COLOR } from "@/lib/brand";
 import { LINHAS_GRUPO, ROTULOS_GRUPO } from "@/lib/ca/linhas";
@@ -357,7 +357,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
           onChange={(e) => {
             setBu(e.target.value);
             setPl("");
-            if (ehCat) void salvar({ bu: e.target.value, pl: "" });
+            void salvar({ bu: e.target.value, pl: "" });
           }}
           disabled={ignorar}
         >
@@ -376,7 +376,9 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
           onChange={(e) => {
             setPl(e.target.value);
             // Linha só-do-grupo não pode contar para vendedor (o Reprocessar a descartaria).
-            if (LINHAS_GRUPO.has(e.target.value)) setConta(false);
+            const grupo = LINHAS_GRUPO.has(e.target.value);
+            if (grupo) setConta(false);
+            void salvar({ pl: e.target.value, ...(grupo ? { conta: false } : {}) });
           }}
           disabled={ignorar || !bu}
         >
@@ -394,7 +396,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
           checked={conta}
           onChange={(e) => {
             setConta(e.target.checked);
-            if (ehCat) void salvar({ conta: e.target.checked });
+            void salvar({ conta: e.target.checked });
           }}
           disabled={ignorar || LINHAS_GRUPO.has(pl)}
           aria-label="Conta para o vendedor"
@@ -408,26 +410,14 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
               checked={ignorar}
               onChange={(e) => {
                 setIgnorar(e.target.checked);
-                if (ehCat) void salvar({ ignorar: e.target.checked });
+                void salvar({ ignorar: e.target.checked });
               }}
             />
             ignorar
           </label>
-          {ehCat ? (
-            <span className="min-w-[4.5rem] text-[11px]" style={{ color: erro ? COLOR.danger : COLOR.ok }}>
-              {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void salvar()}
-              disabled={salvando}
-              title={sug ? "Salvar a sugestão" : "Salvar"}
-              className={`btn !px-2 !py-1 ${sug ? "btn-primary" : "btn-ghost"}`}
-            >
-              <Check className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <span className="min-w-[4.5rem] text-[11px]" style={{ color: erro ? COLOR.danger : COLOR.ok }}>
+            {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
+          </span>
         </div>
       </td>
     </tr>
@@ -480,18 +470,28 @@ function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: stri
   const [sellerId, setSellerId] = useState(v.seller_id ?? sug?.sellerId ?? "");
   const [erro, setErro] = useState<string | null>(null);
 
-  async function salvar() {
+  const [salvo, setSalvo] = useState(false);
+
+  // Salva sozinho ao mudar. "Vendedor" so grava depois de escolher quem (sem isso a
+  // venda sumiria do ranking); ate la a linha avisa em vez de gravar pela metade.
+  async function salvar(d: VendedorMapa["destino"], sid: string) {
     setErro(null);
+    setSalvo(false);
+    if (d === "vendedor" && !sid) {
+      setErro("Escolha o vendedor do Hub.");
+      return;
+    }
     const res = await fetch("/api/ca/vendedores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ca_vendedor_id: v.ca_vendedor_id, destino, seller_id: sellerId || null }),
+      body: JSON.stringify({ ca_vendedor_id: v.ca_vendedor_id, destino: d, seller_id: d === "vendedor" ? sid : null }),
     });
     const j = (await res.json()) as { error?: string };
     if (!res.ok) {
       setErro(j.error ?? "Falhou.");
       return;
     }
+    setSalvo(true);
     startTransition(() => router.refresh());
   }
 
@@ -520,7 +520,11 @@ function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: stri
         <select
           className="input !py-1 text-xs"
           value={destino}
-          onChange={(e) => setDestino(e.target.value as VendedorMapa["destino"])}
+          onChange={(e) => {
+            const d = e.target.value as VendedorMapa["destino"];
+            setDestino(d);
+            void salvar(d, sellerId);
+          }}
         >
           <option value="pendente">Pendente</option>
           <option value="vendedor">Vendedor</option>
@@ -532,7 +536,10 @@ function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: stri
         <select
           className="input !py-1 text-xs"
           value={sellerId}
-          onChange={(e) => setSellerId(e.target.value)}
+          onChange={(e) => {
+            setSellerId(e.target.value);
+            void salvar(destino, e.target.value);
+          }}
           disabled={destino !== "vendedor"}
         >
           <option value="">—</option>
@@ -544,9 +551,9 @@ function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: stri
         </select>
       </td>
       <td className="py-2 align-top">
-        <button type="button" onClick={salvar} disabled={salvando} className="btn btn-ghost !px-2 !py-1">
-          <Check className="h-3.5 w-3.5" />
-        </button>
+        <span className="text-[11px]" style={{ color: erro ? COLOR.danger : COLOR.ok }}>
+          {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
+        </span>
       </td>
     </tr>
   );

@@ -15,6 +15,7 @@
  * regra de runtime: uma votação por maioria rodando para sempre muda de resposta
  * sozinha no dia em que alguém lançar um lote errado — e muda em silêncio.
  */
+import { unstable_cache } from "next/cache";
 import { supabaseAdmin } from "@/lib/supabase";
 import { lerTudo } from "./ler";
 
@@ -64,139 +65,112 @@ async function nomesDeCategoria(): Promise<Map<string, string>> {
 }
 
 /**
- * Para cada item, a categoria dominante nas vendas em que ele aparece COM
- * categoria. É isto que vira sugestão.
+ * UMA leitura do espelho, agregada e em cache.
+ *
+ * Antes a tela de Classificacao lia `ca_vendas` 4 vezes e `ca_venda_itens` 3 vezes
+ * (sugestoes, volumes, itens relevantes, vendedores), todas paginadas de mil em mil
+ * e em sequencia: dezenas de idas ao banco a cada abertura E a cada clique em
+ * salvar (que recarrega a pagina). Agora: ca_vendas e ca_venda_itens lidas UMA vez,
+ * em paralelo, com tudo que a tela precisa agregado de uma passada, e guardadas por
+ * 5 min (ate o proximo sync do espelho, que invalida a tag `ca-espelho`).
+ *
+ * So entra aqui o que NAO depende da classificacao — a classificacao e aplicada
+ * depois, em memoria, sobre estes totais.
  */
-async function sugestoesPorItem(): Promise<Map<string, { categoriaCaId: string; ocorrencias: number; dominancia: number }>> {
-  const vendas = new Map<string, string | null>();
-  for (let f = 0; ; f += 1000) {
-    const { data } = await supabaseAdmin
-      .from("ca_vendas")
-      .select("ca_id, categoria_ca_id")
-      .order("ca_id")
-      .range(f, f + 999);
-    for (const v of data ?? []) vendas.set(v.ca_id as string, (v.categoria_ca_id as string) ?? null);
-    if ((data ?? []).length < 1000) break;
-  }
+export const TAG_ESPELHO = "ca-espelho";
 
-  const contagem = new Map<string, Map<string, number>>();
-  for (let f = 0; ; f += 1000) {
-    const { data } = await supabaseAdmin
-      .from("ca_venda_itens")
-      .select("venda_ca_id, item_ca_id")
-      .order("ca_id")
-      .range(f, f + 999);
-    for (const it of data ?? []) {
-      const item = it.item_ca_id as string | null;
-      const cat = vendas.get(it.venda_ca_id as string);
-      if (!item || !cat) continue;
-      const m = contagem.get(item) ?? new Map<string, number>();
-      m.set(cat, (m.get(cat) ?? 0) + 1);
-      contagem.set(item, m);
+type Vol = { valor: number; vendas: number };
+type EspelhoAgregado = {
+  /** categoria -> quanto movimentou (so vendas COM categoria) */
+  cat: Record<string, Vol>;
+  /** item -> quanto movimentou (valor unitario somado, como sempre foi) */
+  item: Record<string, Vol>;
+  /** item -> em quantas vendas apareceu, por categoria da venda ("_" = venda sem categoria) */
+  itemCats: Record<string, Record<string, number>>;
+  /** vendedor do Conta Azul -> vendas e valor */
+  vendedor: Record<string, Vol>;
+};
+
+const agregarEspelho = unstable_cache(
+  async (): Promise<EspelhoAgregado> => {
+    const [vendas, itens] = await Promise.all([
+      lerTudo<{ ca_id: string; categoria_ca_id: string | null; total: number | null; vendedor_ca_id: string | null }>(
+        "ca_vendas",
+        "ca_id, categoria_ca_id, total, vendedor_ca_id",
+      ),
+      lerTudo<{ ca_id: string; venda_ca_id: string; item_ca_id: string | null; valor: number | null }>(
+        "ca_venda_itens",
+        "ca_id, venda_ca_id, item_ca_id, valor",
+      ),
+    ]);
+
+    const cat: Record<string, Vol> = {};
+    const vendedor: Record<string, Vol> = {};
+    const catDaVenda = new Map<string, string | null>();
+    for (const v of vendas) {
+      const c = v.categoria_ca_id ?? null;
+      catDaVenda.set(v.ca_id, c);
+      if (c) {
+        const a = (cat[c] ??= { valor: 0, vendas: 0 });
+        a.valor += Number(v.total ?? 0);
+        a.vendas += 1;
+      }
+      if (v.vendedor_ca_id) {
+        const a = (vendedor[v.vendedor_ca_id] ??= { valor: 0, vendas: 0 });
+        a.valor += Number(v.total ?? 0);
+        a.vendas += 1;
+      }
     }
-    if ((data ?? []).length < 1000) break;
-  }
 
+    const item: Record<string, Vol> = {};
+    const itemCats: Record<string, Record<string, number>> = {};
+    for (const it of itens) {
+      const id = it.item_ca_id;
+      if (!id) continue;
+      const a = (item[id] ??= { valor: 0, vendas: 0 });
+      a.valor += Number(it.valor ?? 0);
+      a.vendas += 1;
+      const c = catDaVenda.get(it.venda_ca_id);
+      const m = (itemCats[id] ??= {});
+      const k = c ?? "_";
+      m[k] = (m[k] ?? 0) + 1;
+    }
+    return { cat, item, itemCats, vendedor };
+  },
+  ["ca-espelho-agregado-v1"],
+  { revalidate: 300, tags: [TAG_ESPELHO] },
+);
+
+/** Categoria dominante de cada item (so vendas COM categoria) — e isso que vira sugestao. */
+function sugestoesDe(ag: EspelhoAgregado): Map<string, { categoriaCaId: string; ocorrencias: number; dominancia: number }> {
   const out = new Map<string, { categoriaCaId: string; ocorrencias: number; dominancia: number }>();
-  for (const [item, m] of contagem) {
-    const total = [...m.values()].reduce((a, b) => a + b, 0);
-    const [melhor, n] = [...m].sort((a, b) => b[1] - a[1])[0];
+  for (const [item, m] of Object.entries(ag.itemCats)) {
+    const entradas = Object.entries(m).filter(([k]) => k !== "_");
+    if (entradas.length === 0) continue;
+    const total = entradas.reduce((a, [, n]) => a + n, 0);
+    const [melhor, n] = entradas.sort((a, b) => b[1] - a[1])[0];
     out.set(item, { categoriaCaId: melhor, ocorrencias: n, dominancia: total ? n / total : 0 });
   }
   return out;
 }
 
-/** Quanto cada categoria e cada item movimentaram, para ordenar a fila. */
-async function volumes(): Promise<{ cat: Map<string, { valor: number; vendas: number }>; item: Map<string, { valor: number; vendas: number }> }> {
-  const cat = new Map<string, { valor: number; vendas: number }>();
-  const item = new Map<string, { valor: number; vendas: number }>();
-
-  const vendas = new Map<string, { cat: string | null; total: number }>();
-  for (let f = 0; ; f += 1000) {
-    const { data } = await supabaseAdmin
-      .from("ca_vendas")
-      .select("ca_id, categoria_ca_id, total")
-      .order("ca_id")
-      .range(f, f + 999);
-    for (const v of data ?? []) {
-      vendas.set(v.ca_id as string, { cat: (v.categoria_ca_id as string) ?? null, total: Number(v.total ?? 0) });
-      const c = (v.categoria_ca_id as string) ?? null;
-      if (c) {
-        const a = cat.get(c) ?? { valor: 0, vendas: 0 };
-        a.valor += Number(v.total ?? 0);
-        a.vendas += 1;
-        cat.set(c, a);
+/**
+ * Itens cuja classificacao muda alguma coisa: os que aparecem em venda que a
+ * CATEGORIA nao resolve (sem categoria, ou categoria sem linha e nao ignorada).
+ */
+function itensRelevantes(
+  ag: EspelhoAgregado,
+  classificadas: Map<string, { product_line: string | null; ignorar: boolean }>,
+): Set<string> {
+  const out = new Set<string>();
+  for (const [item, m] of Object.entries(ag.itemCats)) {
+    for (const k of Object.keys(m)) {
+      const c = k === "_" ? undefined : classificadas.get(k);
+      if (!(c && (c.product_line || c.ignorar))) {
+        out.add(item);
+        break;
       }
     }
-    if ((data ?? []).length < 1000) break;
-  }
-
-  for (let f = 0; ; f += 1000) {
-    const { data } = await supabaseAdmin
-      .from("ca_venda_itens")
-      .select("item_ca_id, valor")
-      .order("ca_id")
-      .range(f, f + 999);
-    for (const it of data ?? []) {
-      const id = it.item_ca_id as string | null;
-      if (!id) continue;
-      const a = item.get(id) ?? { valor: 0, vendas: 0 };
-      a.valor += Number(it.valor ?? 0);
-      a.vendas += 1;
-      item.set(id, a);
-    }
-    if ((data ?? []).length < 1000) break;
-  }
-
-  return { cat, item };
-}
-
-/**
- * Itens cuja classificação muda alguma coisa.
- *
- * São os que aparecem em venda que a CATEGORIA não resolve — porque aí o item é
- * a única fonte da linha de receita. Dois casos, não um:
- *
- *  1. venda **sem categoria** (nasceu no site);
- *  2. venda com categoria classificada **sem linha**, de propósito: `1.7
- *     MATRÍCULA COLÉGIO` sabe a BU e que conta para vendedor, mas não sabe a
- *     SÉRIE — são 12, e só o nome do item diz qual.
- *
- * O segundo caso faltava, e era o mais caro: os 327 itens do Colégio (R$ 157
- * mil em 70 dias) ficavam marcados como irrelevantes e nunca entravam na fila
- * de classificação, então o "Aplicar as sugestões" passava por cima deles.
- */
-async function itensRelevantes(classificadas: Map<string, { product_line: string | null; ignorar: boolean }>): Promise<Set<string>> {
-  const semLinha = new Set<string>();
-  for (let f = 0; ; f += 1000) {
-    const { data } = await supabaseAdmin
-      .from("ca_vendas")
-      .select("ca_id, categoria_ca_id")
-      .order("ca_id")
-      .range(f, f + 999);
-    for (const v of data ?? []) {
-      const cat = v.categoria_ca_id as string | null;
-      const c = cat ? classificadas.get(cat) : undefined;
-      // Resolvida pela categoria (tem linha, ou foi ignorada de propósito)?
-      if (c && (c.product_line || c.ignorar)) continue;
-      semLinha.add(v.ca_id as string);
-    }
-    if ((data ?? []).length < 1000) break;
-  }
-  const semCategoria = semLinha;
-  const out = new Set<string>();
-  if (semCategoria.size === 0) return out;
-  for (let f = 0; ; f += 1000) {
-    const { data } = await supabaseAdmin
-      .from("ca_venda_itens")
-      .select("item_ca_id, venda_ca_id")
-      .order("ca_id")
-      .range(f, f + 999);
-    for (const i of data ?? []) {
-      const id = i.item_ca_id as string | null;
-      if (id && semCategoria.has(i.venda_ca_id as string)) out.add(id);
-    }
-    if ((data ?? []).length < 1000) break;
   }
   return out;
 }
@@ -210,12 +184,15 @@ export async function listarMapa(): Promise<{ categorias: LinhaMapa[]; itens: Li
       .filter((l) => l.ca_tipo === "categoria")
       .map((l) => [l.ca_id as string, { product_line: (l.product_line as string) ?? null, ignorar: !!l.ignorar }]),
   );
-  const [nomes, sug, vol, relevantes] = await Promise.all([
-    nomesDeCategoria(),
-    sugestoesPorItem(),
-    volumes(),
-    itensRelevantes(classificadas),
-  ]);
+  const ag = await agregarEspelho();
+  const nomes = new Map<string, string>();
+  for (const l of linhas) if (l.ca_tipo === "categoria") nomes.set(l.ca_id as string, (l.ca_nome as string) ?? (l.ca_id as string));
+  const sug = sugestoesDe(ag);
+  const vol = {
+    cat: new Map(Object.entries(ag.cat)),
+    item: new Map(Object.entries(ag.item)),
+  };
+  const relevantes = itensRelevantes(ag, classificadas);
 
   const montar = (tipo: "categoria" | "item"): LinhaMapa[] =>
     linhas
@@ -271,29 +248,11 @@ export interface VendedorMapa {
 }
 
 export async function listarVendedores(): Promise<VendedorMapa[]> {
-  const [{ data: mapa }, agg] = await Promise.all([
-    lerTudo<Record<string, unknown>>("ca_vendedores", "*", { ordenarPor: "ca_vendedor_id" }).then((data) => ({ data })),
-    (async () => {
-      const m = new Map<string, { vendas: number; valor: number }>();
-      for (let f = 0; ; f += 1000) {
-        const { data } = await supabaseAdmin
-          .from("ca_vendas")
-          .select("vendedor_ca_id, total")
-          .order("ca_id")
-          .range(f, f + 999);
-        for (const v of data ?? []) {
-          const id = v.vendedor_ca_id as string | null;
-          if (!id) continue;
-          const a = m.get(id) ?? { vendas: 0, valor: 0 };
-          a.vendas += 1;
-          a.valor += Number(v.total ?? 0);
-          m.set(id, a);
-        }
-        if ((data ?? []).length < 1000) break;
-      }
-      return m;
-    })(),
+  const [mapa, ag] = await Promise.all([
+    lerTudo<Record<string, unknown>>("ca_vendedores", "*", { ordenarPor: "ca_vendedor_id" }),
+    agregarEspelho(),
   ]);
+  const agg = new Map(Object.entries(ag.vendedor));
 
   return (mapa ?? [])
     .map((v) => ({
