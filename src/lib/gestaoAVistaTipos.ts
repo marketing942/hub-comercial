@@ -80,6 +80,12 @@ export type GestaoMes = {
   semDono: number;
   dias: DiaGestao[];
   categorias: LinhaCategoria[];
+  /**
+   * Conferencia com o Conta Azul: soma das VENDAS faturadas/aprovadas do mes no
+   * espelho (`ca_vendas.total`). `null` = nao deu para ler. A diferenca para o
+   * `total` desta tela sao itens marcados "ignorar" e vendas sem item.
+   */
+  conferencia: { caTotal: number } | null;
   /** A tabela `ca_linha_receita` ainda nao existe (rodar supabase/ca-03-linha-receita.sql). */
   semTabela: boolean;
   sync: { em: string | null; erro: string | null };

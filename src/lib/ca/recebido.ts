@@ -163,8 +163,15 @@ export async function gravarEspelho(
    * SUAS vendas usam — e assim a correção não exige um rebuild do Jarvis.
    */
   const usadas = new Set(vendas.map((v) => v.categoria_ca_id).filter(Boolean) as string[]);
+  /**
+   * Alem das usadas nas vendas da janela, TODA categoria de RECEITA do Conta Azul
+   * (codigo "1", "1.5", "1.9"...): receita sem venda na janela — como o repasse da
+   * mensalidade da Unicive — nao aparecia na Classificacao, e nao da para
+   * classificar o que nao se ve. Despesa (codigo "2...") continua de fora.
+   */
+  const ehReceita = (c: Record<string, unknown>) => /^1(\.|\s|$)/.test(txt(c?.codigo) ?? "");
   const categorias = (categoriasRaw as Record<string, unknown>[])
-    .filter((c) => txt(c?.ca_id) && usadas.has(txt(c.ca_id)!))
+    .filter((c) => txt(c?.ca_id) && (usadas.has(txt(c.ca_id)!) || ehReceita(c)))
     .map((c) => ({
       ca_tipo: "categoria" as const,
       ca_id: txt(c.ca_id)!,

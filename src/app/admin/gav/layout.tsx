@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import GavSubnav from "@/components/gav/GavSubnav";
 import { getSession } from "@/lib/auth";
 
 /**
@@ -16,10 +15,6 @@ export default async function GavLayout({ children }: { children: React.ReactNod
   if (!s) redirect("/login");
   if (s.role !== "admin") redirect("/dashboard");
 
-  return (
-    <>
-      <GavSubnav />
-      <div className="pt-3">{children}</div>
-    </>
-  );
+  // Sem sub-menu: o GAV tem uma tela so (Gestao a Vista).
+  return <>{children}</>;
 }

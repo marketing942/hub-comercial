@@ -15,7 +15,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
     ? [
         { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
         // GAV: so admin. Hoje tem a Gestao a Vista (faturamento da empresa).
-        { href: "/admin/gav", label: "GAV", icon: "chart" },
+        { href: "/admin/gav", label: "Gestão a Vista", icon: "chart" },
         {
           href: "/admin/sellers",
           label: "Configuracoes",

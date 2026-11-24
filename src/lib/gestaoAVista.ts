@@ -25,6 +25,8 @@ import { unstable_cache } from "next/cache";
 import { DASHBOARD_TAG, supabaseAdmin } from "./supabase";
 import { fetchAll } from "./data";
 import { nowRecife } from "./calc";
+import { situacaoConta } from "./ca/config";
+import { lerTudo } from "./ca/ler";
 import {
   vazioBu,
   vazioOrigem,
@@ -54,7 +56,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
   const totalDias = new Date(year, mes, 0).getDate();
 
   let semTabela = false;
-  const [linhas, metas, sync] = await Promise.all([
+  const [linhas, metas, sync, conferencia] = await Promise.all([
     (async () => {
       try {
         return await fetchAll<Linha>(
@@ -95,6 +97,19 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
           .eq("recurso", "vendas")
           .maybeSingle();
         return (data as { concluido_em: string | null; erro: string | null } | null) ?? null;
+      } catch {
+        return null;
+      }
+    })(),
+    (async () => {
+      // Quanto o Conta Azul tem de venda faturada/aprovada no mes (o numero a bater).
+      try {
+        const vendas = await lerTudo<{ ca_id: string; situacao: string | null; total: number | null }>(
+          "ca_vendas",
+          "ca_id, situacao, total",
+          { filtrar: (q) => (q as never as { gte: Function; lt: Function }).gte("data", de).lt("data", prox) },
+        );
+        return { caTotal: vendas.filter((v) => situacaoConta(v.situacao)).reduce((s, v) => s + Number(v.total ?? 0), 0) };
       } catch {
         return null;
       }
@@ -157,6 +172,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
     dias,
     categorias: [...cats.values()].filter((c) => c.valor !== 0).sort((a, b) => b.valor - a.valor),
     semTabela,
+    conferencia,
     sync: { em: sync?.concluido_em ?? null, erro: sync?.erro ?? null },
   };
 }
@@ -171,7 +187,7 @@ export function gestaoDoMes(year: number, mes: number): Promise<GestaoMes> {
   const ehCorrente = year > hoje.getFullYear() || (year === hoje.getFullYear() && mes >= hoje.getMonth() + 1);
   return unstable_cache(
     () => calcular(year, mes),
-    [`gestao-a-vista-v3-${year}-${mes}`],
+    [`gestao-a-vista-v4-${year}-${mes}`],
     ehCorrente ? { revalidate: 600, tags: [DASHBOARD_TAG] } : { revalidate: 3600 },
   )();
 }

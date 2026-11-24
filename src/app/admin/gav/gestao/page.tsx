@@ -38,7 +38,7 @@ export default async function GestaoPage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Gestão à Vista</h1>
+          <h1 className="text-2xl font-bold">Gestão a Vista</h1>
           <p className="text-sm text-white/50">
             Faturamento da empresa em {MES_NOME[mes - 1]} de {year}, todas as linhas de receita do Conta Azul.
           </p>
@@ -96,6 +96,30 @@ export default async function GestaoPage({
           ))}
         </div>
       </section>
+
+      {dados.conferencia && !dados.semTabela ? (() => {
+        const dif = dados.conferencia.caTotal - dados.total;
+        const ok = Math.abs(dif) < 1;
+        return (
+          <div
+            className="panel px-4 py-2.5 text-sm"
+            style={{ borderColor: ok ? undefined : "rgba(240,180,76,0.45)", color: ok ? "#5fd08f" : "#f0b44c" }}
+          >
+            {ok ? (
+              <>Conferido: o total desta tela bate com as vendas do Conta Azul no mês ({BRL.format(dados.conferencia.caTotal)}).</>
+            ) : (
+              <>
+                Conta Azul (vendas faturadas/aprovadas): <b>{BRL.format(dados.conferencia.caTotal)}</b> · esta tela:{" "}
+                <b>{BRL.format(dados.total)}</b> · diferença <b>{BRL.format(dif)}</b>
+                <span className="text-white/50">
+                  {" "}
+                  — itens marcados &quot;ignorar&quot; e vendas sem item. Se a diferença for maior que isso, rode Reprocessar.
+                </span>
+              </>
+            )}
+          </div>
+        );
+      })() : null}
 
       {dados.semTabela ? (
         <div className="panel p-4 text-sm" style={{ borderColor: "rgba(240,180,76,0.45)" }}>
