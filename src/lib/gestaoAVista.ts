@@ -54,7 +54,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
   const totalDias = new Date(year, mes, 0).getDate();
 
   let semTabela = false;
-  const [linhas, sync] = await Promise.all([
+  const [linhas, metas, sync] = await Promise.all([
     (async () => {
       try {
         return await fetchAll<Linha>(
@@ -73,6 +73,19 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
         semTabela = true;
         return [] as Linha[];
       }
+    })(),
+    (async () => {
+      // Metas por linha (etapa 2): somadas por categoria; sem a tabela, sem metas.
+      const m = new Map<string, number>();
+      try {
+        const { data } = await supabaseAdmin.from("ca_metas_linha").select("categoria_id, valor_meta").eq("year", year).eq("month", mes);
+        for (const r of (data as { categoria_id: string; valor_meta: number }[]) ?? []) {
+          m.set(r.categoria_id, (m.get(r.categoria_id) ?? 0) + Number(r.valor_meta ?? 0));
+        }
+      } catch {
+        /* sem metas */
+      }
+      return m;
     })(),
     (async () => {
       try {
@@ -118,7 +131,7 @@ async function calcular(year: number, mes: number): Promise<GestaoMes> {
     if (l.sem_dono) semDono += v;
     let c = cats.get(chave);
     if (!c) {
-      c = { chave, rotulo: l.categoria_nome, bu, valor: 0, origem: vazioOrigem() };
+      c = { chave, rotulo: l.categoria_nome, bu, valor: 0, origem: vazioOrigem(), metaValor: metas.get(chave) ?? 0 };
       cats.set(chave, c);
     }
     c.valor += v;

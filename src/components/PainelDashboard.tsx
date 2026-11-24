@@ -42,7 +42,7 @@ const DASHBOARD_CACHE_SECONDS = 120;
 /**
  * Cache de servidor COMPARTILHADO entre abas e TVs.
  *
- * ⚠️ `fonte` entra na chave (`dashboard-data-v3-${fonte}`) **e** nos argumentos.
+ * ⚠️ `fonte` entra na chave (`dashboard-data-v4-${fonte}`) **e** nos argumentos.
  * Sem isso, o dashboard normal e o GAV serviriam um o cache do outro — e, como
  * este cache é de servidor, o erro atravessaria usuários e telas, não só a
  * requisição. Seria o GAV exibindo número manual rotulado como Conta Azul, que é
@@ -60,7 +60,7 @@ const carregar = (fonte: Fonte) =>
       ]);
       return { snaps, direct, ligacaoAll, indicacaoAll };
     },
-    [`dashboard-data-v3-${fonte}`],
+    [`dashboard-data-v4-${fonte}`],
     { revalidate: DASHBOARD_CACHE_SECONDS, tags: [DASHBOARD_TAG] },
   );
 

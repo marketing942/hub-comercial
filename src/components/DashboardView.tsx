@@ -4,6 +4,7 @@ import { BU_COLOR, BU_LABEL, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary } from "@/lib/products";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
+import ReceitaCategoriasCA from "@/components/ReceitaCategoriasCA";
 import LongTermGoalCard from "@/components/LongTermGoalCard";
 import ProgressBar from "@/components/ProgressBar";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
@@ -306,7 +307,13 @@ export default function DashboardView({
         sem uso, porque o da Unicive trazia um total de matrículas no cabeçalho
         que pode fazer falta — se fizer, ele volta como prop daqui.
       */}
-      <ProductRevenueBreakdown rows={breakdown} />
+      {/* Etapa 2: com dado do Conta Azul, o card usa as categorias do proprio CA e a
+          meta de cada uma (Configuracoes > Metas por linha); senao, o card por linha do Hub. */}
+      {snap.categoriasCA?.length > 0 ? (
+        <ReceitaCategoriasCA rows={snap.categoriasCA} />
+      ) : (
+        <ProductRevenueBreakdown rows={breakdown} />
+      )}
     </div>
   );
 }

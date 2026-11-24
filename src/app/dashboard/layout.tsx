@@ -20,7 +20,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           href: "/admin/sellers",
           label: "Configuracoes",
           icon: "settings",
-          activePrefixes: ["/admin/goals", "/admin/vendas", "/admin/comissoes", "/admin/leads", "/admin/direto", "/admin/ano", "/admin/classificacao"],
+          activePrefixes: ["/admin/goals", "/admin/vendas", "/admin/comissoes", "/admin/leads", "/admin/direto", "/admin/ano", "/admin/classificacao", "/admin/metas-linha"],
         },
       ]
     : [

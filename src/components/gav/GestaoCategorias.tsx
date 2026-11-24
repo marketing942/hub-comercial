@@ -59,6 +59,11 @@ export default function GestaoCategorias({ dados }: { dados: GestaoMes }) {
                         <ProgressBar value={pct} color={COLOR.gold} height={6} />
                       </span>
                       <span className="text-right text-sm font-semibold tabular-nums">
+                        {c.metaValor > 0 ? (
+                          <span className="mr-2 text-xs font-normal text-white/40">
+                            meta {BRL.format(c.metaValor)} · {fmtPct((c.valor / c.metaValor) * 100)}
+                          </span>
+                        ) : null}
                         {BRL.format(c.valor)}
                         <span className="ml-2 inline-block w-12 text-right text-xs font-normal text-white/45">{fmtPct(pct)}</span>
                       </span>

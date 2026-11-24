@@ -12,6 +12,7 @@ type Tab = {
 const TABS: Tab[] = [
   { href: "/admin/sellers", label: "Vendedores", icon: <Users className="w-3.5 h-3.5" /> },
   { href: "/admin/goals", label: "Metas", icon: <Target className="w-3.5 h-3.5" /> },
+  { href: "/admin/metas-linha", label: "Metas por linha", icon: <Target className="w-3.5 h-3.5" /> },
   { href: "/admin/vendas", label: "Todas as Vendas", icon: <Receipt className="w-3.5 h-3.5" /> },
   { href: "/admin/comissoes", label: "Comissoes", icon: <Coins className="w-3.5 h-3.5" /> },
   { href: "/admin/leads", label: "Leads", icon: <Zap className="w-3.5 h-3.5" /> },

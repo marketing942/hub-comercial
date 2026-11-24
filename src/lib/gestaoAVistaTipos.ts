@@ -66,6 +66,8 @@ export type LinhaCategoria = {
   bu: BuKey;
   valor: number;
   origem: Record<Origem, number>;
+  /** Meta do mes da categoria (Configuracoes > Metas por linha); 0 = sem meta. */
+  metaValor: number;
 };
 
 export type GestaoMes = {
