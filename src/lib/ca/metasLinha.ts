@@ -19,19 +19,21 @@ function intervalo(year: number, month: number) {
 }
 
 /** Categorias do Conta Azul que pertencem a esta BU (mapa, ou o palpite pelo nome). */
-export async function categoriasDaBu(bu: BU): Promise<{ id: string; nome: string }[]> {
-  const rows = await lerTudo<{ ca_id: string; ca_nome: string | null; bu: string | null; ignorar: boolean | null }>(
+export async function categoriasDaBu(bu: BU): Promise<{ id: string; nome: string; conta: boolean }[]> {
+  const rows = await lerTudo<{ ca_id: string; ca_nome: string | null; bu: string | null; ignorar: boolean | null; conta_vendedor: boolean | null }>(
     "ca_mapa_receita",
-    "ca_id, ca_nome, bu, ignorar",
+    "ca_id, ca_nome, bu, ignorar, conta_vendedor",
     { filtrar: (q) => (q as never as { eq: Function }).eq("ca_tipo", "categoria") },
   );
-  const out: { id: string; nome: string }[] = [];
+  const out: { id: string; nome: string; conta: boolean }[] = [];
   for (const r of rows) {
     const palpite = !r.bu && !r.ignorar ? palpitarCategoria(r.ca_nome) : null;
     const ignora = r.ignorar || !!palpite?.ignorar;
     const buEfetiva = r.bu || palpite?.bu || null;
     if (ignora || buEfetiva !== bu) continue;
-    out.push({ id: r.ca_id, nome: r.ca_nome || `Categoria ${r.ca_id.slice(0, 8)}` });
+    // "Conta para vendedor": o do mapa, ou o palpite pelo nome enquanto ninguem classificou.
+    const conta = r.bu ? !!r.conta_vendedor : !!palpite?.conta_vendedor;
+    out.push({ id: r.ca_id, nome: r.ca_nome || `Categoria ${r.ca_id.slice(0, 8)}`, conta });
   }
   return out.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
 }
@@ -163,5 +165,30 @@ export async function categoriasParaDashboard(bu: BU, year: number, month: numbe
       .sort((a, b) => b.valor - a.valor);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Meta GERAL da BU a partir das metas por linha: soma so das categorias que contam
+ * para vendedor (mensalidade, repasse etc. ficam so na Gestao a Vista). `null` se
+ * nenhuma categoria tem meta — ai vale a meta antiga e o placar nao muda.
+ */
+export async function metaGeralDaBu(bu: BU, year: number, month: number): Promise<{ valor: number; qtd: number } | null> {
+  try {
+    const [cats, gravadas] = await Promise.all([categoriasDaBu(bu), metasGravadas(bu, year, month)]);
+    if (!gravadas) return null;
+    let valor = 0;
+    let qtd = 0;
+    for (const c of cats) {
+      if (!c.conta) continue;
+      const m = gravadas.get(c.id);
+      if (m) {
+        valor += m.valor;
+        qtd += m.qtd;
+      }
+    }
+    return valor > 0 || qtd > 0 ? { valor, qtd } : null;
+  } catch {
+    return null;
   }
 }

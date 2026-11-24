@@ -68,8 +68,66 @@ type SaleLite = {
   quantidade: number;
   ligacao_status?: string | null;
   indicacao_status?: string | null;
+  /** So na leitura por categoria do Conta Azul (etapa 3): BU da categoria. */
+  bu?: string | null;
 };
 const SALE_COLS = "id, seller_id, sale_date, product_line, valor, quantidade, ligacao_status, indicacao_status";
+
+// ---------------------------------------------------------------------------
+// Receita por CATEGORIA do Conta Azul (etapa 3)
+//
+// `ca_linha_receita` tem UMA linha por item valido do Conta Azul, com BU e
+// origem. Quando o mes tem dado ali e a fonte e o Conta Azul, vendedores, BUs e
+// comissoes leem DESTA tabela — e deixam de depender de o item ter sido ligado a
+// uma "linha do Hub" (o que fazia sumir receita). Sem dado (mes antigo, tabela
+// ausente) volta tudo ao caminho anterior.
+// ---------------------------------------------------------------------------
+type CaLinha = {
+  ca_venda_id: string;
+  ca_item_id: string;
+  sale_date: string;
+  valor: number;
+  quantidade: number;
+  categoria_id: string | null;
+  bu: string | null;
+  origem: "vendedores" | "direto" | "diretoria";
+  seller_id: string | null;
+};
+
+/** Linhas do mes, ou `null` se a tabela nao existe / o mes nao foi processado. */
+const loadMonthCa = memo(async (year: number, month: number): Promise<CaLinha[] | null> => {
+  const { firstDay, lastDay } = monthRange(year, month);
+  try {
+    const rows = await fetchAll<CaLinha>(
+      "ca_linha_receita",
+      () =>
+        supabaseAdmin
+          .from("ca_linha_receita")
+          .select("ca_venda_id, ca_item_id, sale_date, valor, quantidade, categoria_id, bu, origem, seller_id")
+          .gte("sale_date", firstDay)
+          .lt("sale_date", lastDay)
+          .order("ca_venda_id")
+          .order("ca_item_id"),
+      true
+    );
+    return rows.length > 0 ? rows : null;
+  } catch {
+    return null;
+  }
+});
+
+/** Linha do Conta Azul no formato das vendas (`SaleLite`), com a BU da categoria. */
+function caComoVenda(l: CaLinha): SaleLite {
+  return {
+    id: `${l.ca_venda_id}:${l.ca_item_id}`,
+    seller_id: l.seller_id ?? "",
+    sale_date: l.sale_date,
+    product_line: l.categoria_id ?? "",
+    valor: Number(l.valor ?? 0),
+    quantidade: Number(l.quantidade ?? 0),
+    bu: l.bu,
+  };
+}
 
 // Todas as vendas do mes (todos os vendedores/BUs), de UMA origem.
 //
@@ -313,17 +371,20 @@ export async function listSellersOfBu(bu: "cppem" | "unicive" | "colegio_cppem",
 // na conversao) saem da mesma lista.
 const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number, fonte: Fonte) => {
   const { firstDay, lastDay } = monthRange(year, month);
-  const [sales, leads, pg, mg] = await Promise.all([
-    fetchAll<SaleLite>("sales(seller)", () =>
-      supabaseAdmin
-        .from("sales")
-        .select("*")
-        .eq("seller_id", sellerId)
-        .eq("origem", fonte)
-        .gte("sale_date", firstDay)
-        .lt("sale_date", lastDay)
-        .order("id")
-    ),
+  const ca = fonte === "conta_azul" ? await loadMonthCa(year, month) : null;
+  const [sales0, leads, pg, mg] = await Promise.all([
+    ca
+      ? Promise.resolve([] as SaleLite[])
+      : fetchAll<SaleLite>("sales(seller)", () =>
+          supabaseAdmin
+            .from("sales")
+            .select("*")
+            .eq("seller_id", sellerId)
+            .eq("origem", fonte)
+            .gte("sale_date", firstDay)
+            .lt("sale_date", lastDay)
+            .order("id")
+        ),
     fetchAll<{ date: string; qty: number }>("daily_leads(seller)", () =>
       supabaseAdmin
         .from("daily_leads")
@@ -346,7 +407,10 @@ const sellerMonthRaw = memo(async (sellerId: string, year: number, month: number
       .eq("year", year)
       .eq("month", month),
   ]);
+  // Etapa 3: com dado do Conta Azul, as vendas do vendedor saem da categoria do CA.
+  const sales = ca ? ca.filter((l) => l.origem === "vendedores" && l.seller_id === sellerId).map(caComoVenda) : sales0;
   return {
+    porCategoria: !!ca,
     sales,
     leads,
     productGoals: ((pg.data as any[]) || []) as Omit<ProductGoalRow, "seller_id">[],
@@ -377,7 +441,7 @@ export async function statsForSellerInBu(
     },
     productGoals: raw.productGoals.filter((g) => pidSet.has(g.product_line)),
     monthly: raw.monthlyGoals.find((g) => g.bu === bu) || null,
-    sales: raw.sales.filter((r) => pidSet.has(r.product_line)),
+    sales: raw.sales.filter((r) => (raw.porCategoria ? r.bu === bu : pidSet.has(r.product_line))),
     // Total de vendas do vendedor em TODAS as BUs no mes (conversao real: leads
     // nao distinguem por BU).
     vendasCountTotal: raw.sales.length,
@@ -403,9 +467,13 @@ export async function statsForAll(opts?: { year?: number; month?: number; fonte?
   const fonte: Fonte = opts?.fonte ?? FONTE_PADRAO;
   // 5 leituras em lote (vendedores, vendas, leads, metas) no lugar de 5
   // consultas por vendedor/BU.
+  const ca = fonte === "conta_azul" ? await loadMonthCa(year, month) : null;
   const [sellers, sales, leads, goals] = await Promise.all([
     listSellers({ onlyActive: true }),
-    loadMonthSales(year, month, fonte),
+    // Etapa 3: com dado do Conta Azul, vendas = categorias do CA (origem vendedores).
+    ca
+      ? Promise.resolve(ca.filter((l) => l.origem === "vendedores" && l.seller_id).map(caComoVenda))
+      : loadMonthSales(year, month, fonte),
     loadMonthLeads(year, month),
     loadMonthGoals(year, month),
   ]);
@@ -446,7 +514,7 @@ export async function statsForAll(opts?: { year?: number; month?: number; fonte?
           },
           productGoals: (pgBySeller.get(seller.id) || []).filter((g) => pidSet.has(g.product_line)),
           monthly: mgBySellerBu.get(`${seller.id}|${bu}`) || null,
-          sales: mine.filter((r) => pidSet.has(r.product_line)),
+          sales: mine.filter((r) => (ca ? r.bu === bu : pidSet.has(r.product_line))),
           vendasCountTotal: mine.length,
           leadsMonth,
           year,
@@ -558,13 +626,18 @@ export async function buSeries(
   // Leituras do mes em lote (compartilhadas com as demais BUs na mesma requisicao).
   const idSet = new Set(ids);
   const pidSet = new Set(productIds);
+  // Etapa 3: com dado do Conta Azul, a BU le as categorias do CA (origem vendedores
+  // e direto, desta BU) e a meta geral vem da soma das metas por linha.
+  const ca = fonte === "conta_azul" ? await loadMonthCa(year, month) : null;
   const [allSales, allLeads, goals, direct] = await Promise.all([
-    loadMonthSales(year, month, fonte),
+    ca ? Promise.resolve([] as SaleLite[]) : loadMonthSales(year, month, fonte),
     loadMonthLeads(year, month),
     loadMonthGoals(year, month),
-    bu === "colegio_cppem" ? Promise.resolve(null) : loadMonthDirect(year, month, fonte),
+    ca || bu === "colegio_cppem" ? Promise.resolve(null) : loadMonthDirect(year, month, fonte),
   ]);
-  const sales = allSales.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
+  const sales = ca
+    ? ca.filter((l) => l.origem === "vendedores" && l.bu === bu && l.seller_id && idSet.has(l.seller_id)).map(caComoVenda)
+    : allSales.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
   const pgoals = goals.productGoals.filter((r) => idSet.has(r.seller_id) && pidSet.has(r.product_line));
   const mgoals = goals.monthlyGoals.filter((r) => idSet.has(r.seller_id) && r.bu === bu);
   const bm = goals.buMeta.find((r) => r.bu === bu) || null;
@@ -577,8 +650,17 @@ export async function buSeries(
   const mgQtd = (mgoals || []).reduce((a: number, b: any) => a + Number(b.quantidade_meta || 0), 0);
   const pgValor = (pgoals || []).reduce((a: number, b: any) => a + Number(b.valor_meta || 0), 0);
   const pgQtd = (pgoals || []).reduce((a: number, b: any) => a + Number(b.quantidade_meta || 0), 0);
-  const metaValor = mgValor > 0 ? mgValor : pgValor;
-  const qtdMeta = mgQtd > 0 ? mgQtd : pgQtd;
+  let metaValor = mgValor > 0 ? mgValor : pgValor;
+  let qtdMeta = mgQtd > 0 ? mgQtd : pgQtd;
+  if (ca) {
+    // Meta geral da BU = soma das metas por linha (so categorias que contam p/ vendedor).
+    const { metaGeralDaBu } = await import("./ca/metasLinha");
+    const porLinha = await metaGeralDaBu(bu, year, month);
+    if (porLinha) {
+      metaValor = porLinha.valor;
+      qtdMeta = porLinha.qtd;
+    }
+  }
 
   const ticketMetaAvg = (mgoals || []).length > 0
     ? (mgoals || []).reduce((a: number, b: any) => a + Number(b.ticket_medio_meta || 0), 0) / (mgoals || []).length
@@ -589,7 +671,13 @@ export async function buSeries(
   // vendedor. O canal 'direto' e so CPPEM; o canal 'ia' pode ser tanto
   // CPPEM quanto UNICIVE. Filtra por product_line pra pegar so as
   // vendas relevantes pra BU atual (Colegio nunca tem venda no direto/IA).
-  const directSales = direct ? direct.sales.filter((s) => pidSet.has(s.product_line)) : [];
+  const directSales = ca
+    ? ca
+        .filter((l) => l.origem === "direto" && l.bu === bu)
+        .map((l) => ({ sale_date: l.sale_date, valor: Number(l.valor ?? 0), quantidade: Number(l.quantidade ?? 0), product_line: l.categoria_id ?? "" }))
+    : direct
+      ? direct.sales.filter((s) => pidSet.has(s.product_line))
+      : [];
 
   const buckets: Record<string, { valor: number; qtd: number; leads: number }> = {};
   for (let d = 1; d <= total; d++) {
@@ -783,7 +871,7 @@ export async function sellerSeries(
 
   const raw = await sellerMonthRaw(seller.id, year, month, fonte);
   const pidSet = new Set(productIds);
-  const sales = raw.sales.filter((r) => pidSet.has(r.product_line));
+  const sales = raw.sales.filter((r) => (raw.porCategoria ? r.bu === bu : pidSet.has(r.product_line)));
   const leadsRows = raw.leads;
 
   const buckets: Record<string, { valor: number; qtd: number; leads: number }> = {};
