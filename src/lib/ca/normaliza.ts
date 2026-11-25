@@ -32,6 +32,7 @@ import { lerPorChaves, lerTudo } from "./ler";
 import { LINHAS_VENDEDOR, linhaValida } from "./linhas";
 import { palpitarCategoria } from "./sugestao";
 import { nomeDoCA } from "./nomes";
+import { OVERRIDE_POR_VENDA } from "./overrides";
 
 type Destino = "vendedor" | "canal_direto" | "grupo" | "pendente";
 
@@ -57,6 +58,9 @@ export interface ResultadoNormalizacao {
   /** Linhas que acharam dono pela BU, por ela ter um vendedor só (ver `donoDaBu`). */
   herdadosPelaBu: number;
   valorHerdado: number;
+  /** Linhas cujo vendedor veio de `./overrides.ts`, não do Conta Azul. */
+  forcados: number;
+  valorForcado: number;
   ignorados: number;
   linhaInvalida: number;
   /** Linhas gravadas em `ca_linha_receita` (receita por categoria do Conta Azul). */
@@ -76,6 +80,8 @@ const vazio = (): ResultadoNormalizacao => ({
   valorSemDono: 0,
   herdadosPelaBu: 0,
   valorHerdado: 0,
+  forcados: 0,
+  valorForcado: 0,
   ignorados: 0,
   linhaInvalida: 0,
   paraLinha: 0,
@@ -266,7 +272,21 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
           let sellerFato: string | null = null;
           let semDono = false;
           if (contaFato) {
-            if (destino === "vendedor" && vend?.seller_id) {
+            /**
+             * O override por venda vale AQUI TAMBÉM, e antes do destino.
+             *
+             * Esta decisão alimenta `ca_linha_receita` (a Gestão à Vista) e a
+             * de baixo alimenta `sales` (a meta do vendedor). São dois
+             * caminhos para a mesma venda: sem o override nos dois, as 8 do
+             * EBK Unicive contariam para a dupla na meta e apareceriam como
+             * canal direto no faturamento — a mesma venda com dois donos,
+             * dependendo da tela. Ver `./overrides.ts`.
+             */
+            const forcadoLinha = OVERRIDE_POR_VENDA.get(vid);
+            if (forcadoLinha) {
+              origem = "vendedores";
+              sellerFato = forcadoLinha;
+            } else if (destino === "vendedor" && vend?.seller_id) {
               origem = "vendedores";
               sellerFato = vend.seller_id;
             } else if (destino === "canal_direto") {
@@ -360,6 +380,23 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
         // Linha desconhecida nunca entra em `sales`: `buFromProductLine()` a
         // mandaria para o CPPEM sem avisar ninguém.
         r.linhaInvalida++;
+        continue;
+      }
+
+      /**
+       * O override vem ANTES de `destino` de propósito.
+       *
+       * O caso que o criou é exatamente uma venda cujo `destino` é
+       * `canal_direto` e cujo valor é de uma dupla de vendedores — se a
+       * consulta viesse depois, o `canal_direto` ganharia e o override nunca
+       * dispararia. Ver `./overrides.ts` para por que o Conta Azul não
+       * consegue mais corrigir isso na origem.
+       */
+      const forcado = OVERRIDE_POR_VENDA.get(vid);
+      if (forcado) {
+        r.forcados++;
+        r.valorForcado += totalLinha;
+        paraSales.push({ ...base, seller_id: forcado });
         continue;
       }
 
