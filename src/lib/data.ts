@@ -1389,7 +1389,6 @@ export type DashboardSnapshot = {
   sellers: SellerStats[];
   taxaConversao: number;
   leadsTotal: number;
-  longTerm: import("./longTerm").LongTermProgress | null;
   // A receita por categoria/linha saiu dos paineis das BUs em 25/11/2026: fica
   // so no GAV. Por isso o snapshot nao le mais categorias, ligacao nem indicacao.
 };
@@ -1401,15 +1400,8 @@ export async function dashboardSnapshot(
   // as mesmas consultas uma vez por BU.
   allStats?: SellerStats[]
 ): Promise<DashboardSnapshot> {
-  const { loadLongTermGoal, computeLongTermProgress } = await import("./longTerm");
-  const [series, all, ltGoal] = await Promise.all([
-    buSeries(bu, opts),
-    allStats ?? statsForAll(opts),
-    // A meta longa NAO tem origem: ela conta matriculas da base, nao vendas do
-    // mes. Fica igual nas duas visoes, de proposito.
-    loadLongTermGoal(bu),
-  ]);
-  const longTerm = ltGoal ? await computeLongTermProgress(ltGoal) : null;
+  // A meta de longo prazo (matriculas do Colegio) saiu do sistema em 26/11/2026.
+  const [series, all] = await Promise.all([buSeries(bu, opts), allStats ?? statsForAll(opts)]);
   const sellers = all.filter((s) => s.bu === bu);
   // Leads sao por vendedor (sem distincao de BU). Pra evitar dupla contagem
   // em vendedor multi-BU, dedup por sellerId.
@@ -1420,7 +1412,7 @@ export async function dashboardSnapshot(
   const leadsTotal = Array.from(leadsBySeller.values()).reduce((a, b) => a + b, 0);
   const vendas = sellers.reduce((a, b) => a + b.vendasCount, 0);
   const taxaConversao = leadsTotal > 0 ? (vendas / leadsTotal) * 100 : 0;
-  return { bu, series, sellers, leadsTotal, taxaConversao, longTerm };
+  return { bu, series, sellers, leadsTotal, taxaConversao };
 }
 
 export { daysInMonth, daysRemainingIncludingToday, todayDayOfMonth, periodNow };

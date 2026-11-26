@@ -3,7 +3,6 @@ import { BRL, fmtInt, fmtPct, paceProjection } from "@/lib/calc";
 import { BU_COLOR, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary } from "@/lib/products";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
-import LongTermGoalCard from "@/components/LongTermGoalCard";
 import Indicador, { type Linha } from "@/components/Indicador";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
@@ -174,7 +173,6 @@ export default function DashboardView({
 
   return (
     <div className="space-y-2">
-      {snap.longTerm && <LongTermGoalCard progress={snap.longTerm} accent={color} />}
 
       {/* 1) Placar + evolucao: a historia do mes de relance */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-2">

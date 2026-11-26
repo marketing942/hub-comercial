@@ -12,12 +12,11 @@
  */
 
 import type { ReactNode } from "react";
-import BarraBala, { LegendaBala } from "@/components/gav/BarraBala";
+import BarraSegmentada, { LegendaSegmentada } from "@/components/gav/BarraSegmentada";
 import DetalheOrigem from "@/components/gav/DetalheOrigem";
 import Dica from "@/components/gav/Dica";
 import { tomRitmo } from "@/lib/ritmo";
-import GavGrafico from "@/components/gav/GavGraficoLazy";
-import type { PontoGav } from "@/components/gav/GavGrafico";
+import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import { COLOR } from "@/lib/brand";
 import {
   businessDaysElapsed,
@@ -91,9 +90,9 @@ function LinhaBala({
   idealPct,
   altura = 9,
   marca,
+  ponto,
   extra,
   grande,
-  falta,
 }: {
   rotulo: string;
   titulo?: string;
@@ -105,10 +104,10 @@ function LinhaBala({
   altura?: number;
   /** Quadradinho de cor antes do nome (identidade da origem). */
   marca?: string;
+  /** Bolinha de cor antes do nome (identidade da origem). */
+  ponto?: string;
   extra?: ReactNode;
   grande?: boolean;
-  /** 3a barra com quanto falta para a meta. */
-  falta?: boolean;
 }) {
   const tm = meta > 0;
   const p = tm ? (real / meta) * 100 : 0;
@@ -118,6 +117,7 @@ function LinhaBala({
       {marca && <i aria-hidden className="absolute inset-y-0 left-0 w-[3px] rounded-full" style={{ background: marca }} />}
       <div className="mb-1 flex items-baseline justify-between gap-2">
         <span className="flex min-w-0 items-baseline gap-1.5">
+          {ponto && <i className="h-2 w-2 shrink-0 translate-y-[-1px] rounded-full" style={{ background: ponto }} />}
           <span
             className={grande ? "shrink-0 font-ui text-[13px] font-bold uppercase tracking-[0.12em]" : "truncate text-[12px] font-medium text-white"}
             title={titulo || rotulo}
@@ -137,7 +137,7 @@ function LinhaBala({
           )}
         </span>
       </div>
-      <BarraBala real={real} meta={meta} idealPct={idealPct} altura={altura} falta={falta} />
+      <BarraSegmentada real={real} meta={meta} altura={altura} />
     </div>
   );
 }
@@ -169,15 +169,19 @@ export default function GavPainel({
   const falta = Math.max(0, meta - real);
   const corEmpresa = tom(pct, idealPct, temMeta);
 
-  // Pontos do grafico: ritmo ideal acumulado por dia util.
+  // Linhas do grafico (mesmo formato da Evolucao diaria): faturamento do dia, % da meta
+  // acumulada e % ideal pelos dias uteis.
   let du = 0;
-  const pontos: PontoGav[] = dados.dias.map((d) => {
+  let acc = 0;
+  const mm = String(month).padStart(2, "0");
+  const linhasGrafico: UnifiedChartRow[] = dados.dias.map((d) => {
     if (isBusinessDay(year, month, d.dia)) du++;
+    acc += d.total;
     return {
-      dia: d.dia,
-      diario: d.total,
-      acumulado: d.acumulado,
-      ideal: temMeta && duTotal > 0 ? (meta * du) / duTotal : null,
+      day: `${String(d.dia).padStart(2, "0")}/${mm}`,
+      valor: d.total,
+      pct: temMeta ? (acc / meta) * 100 : 0,
+      idealPct: duTotal > 0 ? (du / duTotal) * 100 : 0,
     };
   });
 
@@ -226,43 +230,29 @@ export default function GavPainel({
               </div>
             </div>
 
-            {/* Separador */}
-            <div className="col-span-4 my-3 h-px bg-[var(--hair)]" />
-
-            {/* Uma linha por origem, mesmas colunas */}
-            {ORIGENS.flatMap((o) => {
-              const v = dados.porOrigem[o];
-              const m = dados.metaPorOrigem[o];
-              const g = v - m;
-              return [
-                <div key={`${o}-r`} className="pb-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <i className="h-2 w-2 shrink-0 rounded-full" style={{ background: COR_ORIGEM[o] }} />
-                    <span className="kpi-label">{ORIGEM_ROTULO[o]}</span>
-                    {real > 0 && <Dica texto={`${ORIGEM_ROTULO[o]} representa ${fmtPct((v / real) * 100)} da receita total do grupo educacional.`} />}
-                    {o === "direto" && detalheDireto && (
-                      <DetalheOrigem titulo="Direto · detalhes do mês" inline gatilho={<span className="text-[10px] font-semibold text-accent/70 hover:text-accent">detalhes ›</span>}>
-                        {detalheDireto}
-                      </DetalheOrigem>
-                    )}
-                  </div>
-                  <div className="gav-hero-origem mt-1 font-display font-bold leading-none tabular-nums text-white/90">{brl(v)}</div>
-                </div>,
-                <div key={`${o}-m`} className="col flex items-end self-stretch pb-2.5">
-                  <div className="gav-hero-origem font-display font-bold leading-none tabular-nums text-white/70">{m > 0 ? brl(m) : "—"}</div>
-                </div>,
-                <div key={`${o}-g`} className="col flex items-end self-stretch pb-2.5">
-                  <div className="gav-hero-origem whitespace-nowrap font-display font-bold leading-none tabular-nums text-white/70">
-                    {m > 0 ? `${g >= 0 ? "+" : "−"}${brl(Math.abs(g))}` : "—"}
-                  </div>
-                </div>,
-                <div key={`${o}-p`} className="col flex items-end self-stretch pb-2.5">
-                  <div className="gav-hero-origem font-display font-bold leading-none tabular-nums" style={{ color: m > 0 ? tom((v / m) * 100, idealPct, true) : COLOR.mute }}>
-                    {m > 0 ? fmtPct((v / m) * 100) : "—"}
-                  </div>
-                </div>,
-              ];
-            })}
+          </div>
+          {/* Por origem (26/11/2026): barras segmentadas lado a lado (realizado x falta). */}
+          <div className="mt-4 grid gap-x-5 gap-y-3 border-t border-[var(--hair)] pt-3 sm:grid-cols-3">
+            {ORIGENS.map((o) => (
+              <LinhaBala
+                key={o}
+                grande
+                ponto={COR_ORIGEM[o]}
+                rotulo={ORIGEM_ROTULO[o]}
+                dica={real > 0 ? `${ORIGEM_ROTULO[o]} representa ${fmtPct((dados.porOrigem[o] / real) * 100)} da receita total do grupo educacional.` : undefined}
+                real={dados.porOrigem[o]}
+                meta={dados.metaPorOrigem[o]}
+                idealPct={idealPct}
+                altura={12}
+                extra={
+                  o === "direto" && detalheDireto ? (
+                    <DetalheOrigem titulo="Direto · detalhes do mês" inline gatilho={<span className="text-[10px] font-semibold text-accent/70 hover:text-accent">detalhes ›</span>}>
+                      {detalheDireto}
+                    </DetalheOrigem>
+                  ) : undefined
+                }
+              />
+            ))}
           </div>
         </section>
 
@@ -270,7 +260,7 @@ export default function GavPainel({
           <section className="gav-porbu panel flex flex-col p-4 xl:col-span-5">
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <div className="eyebrow-label">Por BU</div>
-              <LegendaBala comRitmo={false} />
+              <LegendaSegmentada />
             </div>
             {bus.length === 0 ? (
               <p className="my-auto text-center text-sm text-white/50">
@@ -287,8 +277,7 @@ export default function GavPainel({
                     real={dados.porBu[b]}
                     meta={dados.metaPorBu[b]}
                     idealPct={idealPct}
-                    altura={13}
-                    falta
+                    altura={14}
                   />
                 ))}
               </div>
@@ -301,16 +290,24 @@ export default function GavPainel({
           na horizontal, e as linhas de receita embaixo, grade de 4 — a mesma historia. A BU
           de cada linha e a bolinha colorida ao lado do nome. */}
       <section className="panel p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="eyebrow-label">Acumulado x ritmo da meta</div>
-            <div className="flex items-center gap-3 text-[11px] text-white/45">
-              <span className="inline-flex items-center gap-1.5"><i className="inline-block h-[3px] w-4 rounded" style={{ background: COLOR.gold }} />Acumulado</span>
-              {temMeta && <span className="inline-flex items-center gap-1.5"><i className="inline-block w-4 border-t-2 border-dashed" style={{ borderColor: COLOR.warning }} />Ritmo</span>}
-              <span className="inline-flex items-center gap-1.5"><i className="inline-block h-2.5 w-2 rounded-sm" style={{ background: COLOR.gold, opacity: 0.35 }} />No dia</span>
-            </div>
-          </div>
-          <div className="gav-grafico mt-2 h-[300px] max-sm:h-[240px]">
-            <GavGrafico pontos={pontos} meta={meta} />
+          {/* Mesmo componente da "Evolucao diaria" dos paineis das BUs (26/11/2026):
+              faturamento do dia em barras, % da meta acumulada, % ideal (dias uteis) e projecao. */}
+          <div className="eyebrow-label mb-2">Acumulado x ritmo da meta</div>
+          <div className="gav-grafico">
+            <UnifiedDailyChart
+              data={linhasGrafico}
+              leftUnit="currency"
+              rightUnit="percent"
+              rightPercentScale
+              showIdealReference
+              today={corrente ? hoje.getDate() : undefined}
+              height="var(--gav-graf-h, 260px)"
+              series={[
+                { key: "valor", label: "Faturamento (dia)", color: COLOR.gold, axis: "left", unit: "currency", strokeWidth: 2.5 },
+                { key: "pct", label: "% Meta acumulada", color: corEmpresa === COLOR.mute ? COLOR.gold : corEmpresa, axis: "right", unit: "percent", strokeWidth: 3 },
+                { key: "idealPct", label: "% Ideal", color: COLOR.warning, axis: "right", unit: "percent", dashed: true, strokeWidth: 1.5 },
+              ]}
+            />
           </div>
         <div className="mt-3 border-t border-[var(--hair)] pt-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
@@ -324,7 +321,7 @@ export default function GavPainel({
                   </span>
                 ))}
               </span>
-              <LegendaBala comRitmo={false} />
+              <LegendaSegmentada />
             </div>
           </div>
           <div className="linhas-receita grid gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -342,7 +339,7 @@ export default function GavPainel({
                 real={l.valor}
                 meta={l.metaValor}
                 idealPct={idealPct}
-                altura={13}
+                altura={11}
               />
             ))}
           </div>

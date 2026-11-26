@@ -23,7 +23,7 @@ export default function Sidebar({
   items,
   extra,
 }: {
-  role: "admin" | "seller";
+  role: "admin" | "supervisor" | "seller";
   sellerName?: string;
   items: SidebarItem[];
   /** Acoes extras antes do Sair (vendedor: foto e senha, que sairam do cabecalho do Meu Painel). */
@@ -45,7 +45,7 @@ export default function Sidebar({
     (it.activePrefixes || []).some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   const configAtiva = CONFIG_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
-  const who = sellerName || (role === "admin" ? "Admin" : "Vendedor");
+  const who = sellerName || (role === "admin" ? "Admin" : role === "supervisor" ? "Comercial" : "Vendedor");
 
   return (
     <header className="app-topbar sticky top-0 z-50 border-b border-[var(--hair)] bg-bg/80 backdrop-blur-xl">
@@ -75,7 +75,7 @@ export default function Sidebar({
         <div className="ml-auto flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 text-sm">
             <span className="font-ui text-[11px] uppercase tracking-[0.14em] text-white/40">
-              {role === "admin" ? "Administrador" : "Vendedor"}
+              {role === "admin" ? "Administrador" : role === "supervisor" ? "Supervisor" : "Vendedor"}
             </span>
             <span className="font-semibold">{who}</span>
           </div>

@@ -1,6 +1,13 @@
 import { cookies } from "next/headers";
 
-export type Role = "admin" | "seller";
+/**
+ * Niveis de acesso (26/11/2026):
+ *  - admin: tudo (GAV, BUs, Vendedores, Configuracoes).
+ *  - supervisor: supervisor comercial — SO assiste os paineis das BUs e o de
+ *    Vendedores (TVs do comercial). Sem GAV, sem Configuracoes, sem escrita.
+ *  - seller: o proprio Meu Painel + os slides das proprias BUs.
+ */
+export type Role = "admin" | "supervisor" | "seller";
 export type Session = { role: Role; sellerId?: string };
 
 const COOKIE = "hub_session";
@@ -77,7 +84,7 @@ export async function decodeSession(token?: string | null): Promise<Session | nu
       return null;
     }
     const { role, sellerId } = parsed;
-    if (role !== "admin" && role !== "seller") return null;
+    if (role !== "admin" && role !== "supervisor" && role !== "seller") return null;
     return { role, sellerId };
   } catch (err) {
     console.error("decodeSession falhou:", err);

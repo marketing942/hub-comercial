@@ -7,7 +7,7 @@ export default function AppShell({
   extra,
   children,
 }: {
-  role: "admin" | "seller";
+  role: "admin" | "supervisor" | "seller";
   sellerName?: string;
   items: SidebarItem[];
   extra?: React.ReactNode;

@@ -9,7 +9,8 @@ import { verifyPassword } from "@/lib/password";
 //
 // Ordem:
 //   1) ADMIN_PASSWORD do env -> role=admin
-//   2) procura em sellers ativos com password_hash setado -> role=seller
+//   2) SUPERVISOR_PASSWORD do env (opcional) -> role=supervisor (TVs do comercial)
+//   3) procura em sellers ativos com password_hash setado -> role=seller
 //   3) 401
 //
 // SELLER_PASSWORD do env NAO e mais usado — cada vendedor tem sua
@@ -41,6 +42,14 @@ export async function POST(req: Request) {
   if (safeEqual(password, admin)) {
     const res = NextResponse.json({ ok: true, role: "admin" });
     res.cookies.set(await sessionCookie({ role: "admin" }));
+    return res;
+  }
+
+  // Supervisor comercial: chave unica do env (opcional; sem ela, o nivel nao existe).
+  const supervisor = process.env.SUPERVISOR_PASSWORD;
+  if (supervisor && safeEqual(password, supervisor)) {
+    const res = NextResponse.json({ ok: true, role: "supervisor" });
+    res.cookies.set(await sessionCookie({ role: "supervisor" }));
     return res;
   }
 

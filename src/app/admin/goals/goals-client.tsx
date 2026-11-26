@@ -35,13 +35,10 @@ export default function GoalsClient({
   sellers,
   defaultYear,
   defaultMonth,
-  metaLongaColegio,
 }: {
   sellers: Seller[];
   defaultYear: number;
   defaultMonth: number;
-  /** Editor da meta de longo prazo: so aparece com o Colegio selecionado (26/11/2026). */
-  metaLongaColegio?: React.ReactNode;
 }) {
   const [bu, setBu] = useState<BU>("cppem");
   const [year, setYear] = useState(defaultYear);
@@ -379,7 +376,6 @@ export default function GoalsClient({
           </div>
         )}
       </section>
-      {bu === "colegio_cppem" && metaLongaColegio}
     </div>
   );
 }

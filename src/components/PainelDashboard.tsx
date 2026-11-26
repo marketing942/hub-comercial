@@ -85,18 +85,19 @@ export default async function PainelDashboard({
   const allSellers = snaps.flatMap((s) => s.sellers);
 
   // Filtra os slides por role: vendedor so ve as BUs em que atua e o slide de
-  // Vendedores. Admin ve tudo (o Direto virou detalhe clicavel dentro do GAV).
+  // Vendedores. Supervisor comercial ve o GAV, todas as BUs e Vendedores (sem Configuracoes).
+  // Admin ve tudo (o Direto virou detalhe clicavel dentro do GAV).
   const session = await getSession();
   const isAdmin = session?.role === "admin";
   let allowedBus: BU[] = [...ALL_BUS];
-  if (!isAdmin && session?.sellerId) {
+  if (session?.role === "seller" && session.sellerId) {
     const seller = await getSeller(session.sellerId);
     allowedBus = seller ? buListOf(seller) : [];
   }
   const allowedBuSet = new Set<BU>(allowedBus);
 
   const buSlides = snaps
-    .filter((snap) => isAdmin || allowedBuSet.has(snap.bu))
+    .filter((snap) => allowedBuSet.has(snap.bu))
     .map((snap) => ({
       key: snap.bu,
       label: BU_LABEL[snap.bu],
@@ -111,9 +112,11 @@ export default async function PainelDashboard({
       ),
     }));
 
-  // GAV (Gestao a Vista da empresa): primeiro slide, so admin. Le o Conta Azul
+  // GAV (Gestao a Vista da empresa): primeiro slide, admin e supervisor. Le o Conta Azul
   // inteiro (ca_linha_receita), entao so faz sentido na fonte Conta Azul.
-  const gav = isAdmin && fonte === "conta_azul" ? await gestaoDoMes(year, month) : null;
+  // Admin e supervisor comercial (TVs do comercial) veem o GAV; vendedor nao.
+  const veGav = isAdmin || session?.role === "supervisor";
+  const gav = veGav && fonte === "conta_azul" ? await gestaoDoMes(year, month) : null;
 
   const slides = [
     ...(gav

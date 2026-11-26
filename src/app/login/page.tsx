@@ -25,7 +25,7 @@ export default function LoginPage() {
     const j = await res.json().catch(() => ({}));
     // Navegacao completa (nao router.push): limpa o Router Cache do Next, senao a
     // barra do topo da conta anterior (ex.: admin) fica guardada e reaparece.
-    window.location.assign(j.role === "admin" ? "/dashboard" : "/seller");
+    window.location.assign(j.role === "seller" ? "/seller" : "/dashboard");
   }
 
   return (

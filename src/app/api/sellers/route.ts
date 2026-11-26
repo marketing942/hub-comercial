@@ -9,7 +9,12 @@ export async function GET() {
   if (!s) return NextResponse.json({ error: "Nao autorizado." }, { status: 401 });
   const { data, error } = await supabaseAdmin.from("sellers").select("*").order("name");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  // Nunca devolve o hash da senha (qualquer sessao logada le esta rota, inclusive TVs).
+  const limpos = (data || []).map(({ password_hash, ...resto }: Record<string, unknown>) => ({
+    ...resto,
+    has_password: Boolean(password_hash),
+  }));
+  return NextResponse.json({ data: limpos });
 }
 
 function sanitizeBus(input: any, fallbackBu: string): string[] {

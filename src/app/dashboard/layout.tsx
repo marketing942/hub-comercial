@@ -8,9 +8,10 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const s = await getSession();
   if (!s) redirect("/login");
   const isAdmin = s.role === "admin";
-  const seller = !isAdmin && s.sellerId ? await getSeller(s.sellerId) : null;
+  const seller = s.role === "seller" && s.sellerId ? await getSeller(s.sellerId) : null;
 
-  const items: SidebarItem[] = isAdmin
+  // Admin e supervisor comercial: so a Gestao a Vista (o supervisor nao tem Configuracoes).
+  const items: SidebarItem[] = isAdmin || s.role === "supervisor"
     ? [{ href: "/dashboard", label: "Gestão à Vista", icon: "trophy" }]
     : [
         { href: "/dashboard", label: "Gestão à Vista", icon: "trophy" },

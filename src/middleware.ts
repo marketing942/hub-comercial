@@ -39,6 +39,10 @@ export async function middleware(req: NextRequest) {
   if (!session && (isAdminArea || isSellerArea || isDashboard)) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
+  // Supervisor comercial so assiste os paineis: nada de /admin nem /seller.
+  if (session?.role === "supervisor" && (isAdminArea || isSellerArea)) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
   if (session?.role === "seller" && isAdminArea) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }

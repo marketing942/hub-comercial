@@ -1,17 +1,12 @@
 import { listSellers } from "@/lib/data";
 import { periodNow } from "@/lib/calc";
-import { listLongTermGoals } from "@/lib/longTerm";
 import ConfiguracoesSubnav from "@/components/ConfiguracoesSubnav";
 import GoalsClient from "./goals-client";
-import LongTermGoalsEditor from "./LongTermGoalsEditor";
 
 export const dynamic = "force-dynamic";
 
 export default async function GoalsPage() {
-  const [sellers, longTermGoals] = await Promise.all([
-    listSellers({ onlyActive: true }),
-    listLongTermGoals(),
-  ]);
+  const sellers = await listSellers({ onlyActive: true });
   const { year, month } = periodNow();
   return (
     <div className="space-y-6">
@@ -26,7 +21,6 @@ export default async function GoalsPage() {
         sellers={sellers}
         defaultYear={year}
         defaultMonth={month}
-        metaLongaColegio={<LongTermGoalsEditor initial={longTermGoals} />}
       />
     </div>
   );

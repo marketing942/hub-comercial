@@ -107,13 +107,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .tv-mode .kpi-num { font-size: 1.25rem; }
 /* Barras duplas (realizado x meta): altura vem de --h; na TV crescem 30% no GAV. */
 .barra-dupla { height: var(--h, 18px); }
+/* Barra segmentada do GAV (realizado x falta); altura do grafico do GAV via variavel. */
+.barra-seg { height: var(--h, 12px); }
+.gav { --gav-graf-h: 300px; }
+.tv-mode .gav { --gav-graf-h: 190px; }
 .tv-mode .gav .barra-dupla > span { font-size: 13px !important; }
 /* GAV v2: barra de bala (altura em --h; cresce 15% na TV) e numeros do topo que
    seguem a LARGURA DO CARD (cqi) — nunca cortam, em qualquer monitor ou TV. */
 .bala { height: var(--h, 10px); }
 .tv-mode .gav .bala { height: calc(var(--h, 10px) * 1.15); }
 .gav-hero { container-type: inline-size; }
-.gav-hero-num { font-size: clamp(1.4rem, 4.9cqi, 2.9rem); white-space: nowrap; }
+.gav-hero-num { font-size: clamp(1.3rem, 4.4cqi, 2.6rem); white-space: nowrap; }
 .gav-hero-sub { font-size: clamp(1.05rem, 3.1cqi, 1.9rem); }
 .gav-hero-origem { font-size: clamp(0.85rem, 2.1cqi, 1.3rem); }
 .tv-mode .big-num { font-size: 2rem; line-height: 1.05; }
@@ -137,7 +141,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .tv-mode .gav .panel.p-4 { padding: 0.6rem 0.85rem; }
   .tv-mode .gav .panel.p-3 { padding: 0.5rem 0.7rem; }
   .tv-mode .gav .cell { padding: 0.45rem 0.75rem !important; }
-  .tv-mode .gav .gav-grafico { min-height: 0; height: 150px !important; }
   .tv-mode .gav .linhas-receita { row-gap: 0.85rem; }
   .tv-mode .gav .gav-porbu .barra-dupla { height: 14px; }
   .tv-mode .gav .gav-porbu .barra-dupla > span { font-size: 11px !important; }
