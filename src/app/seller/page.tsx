@@ -19,6 +19,7 @@ import ProgressBar from "@/components/ProgressBar";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import AvatarUploader from "@/components/AvatarUploader";
 import ChangePasswordButton from "@/components/ChangePasswordButton";
+import MinhaComissao from "./MinhaComissao";
 
 export const dynamic = "force-dynamic";
 
@@ -91,33 +92,36 @@ export default async function MyPanel({
     };
   });
 
+  // Indicadores da faixa "Minha meta": 8 em toda BU (+ faturamento nas BUs de
+  // quantidade, + matriculas no Unicive). 4 por linha; 5 quando passa de 8. As
+  // celulas vazias so completam a ultima linha (a grade fica fechada).
+  const nCells = 8 + (isQtd ? 1 : 0) + (bu === "unicive" ? 1 : 0);
+  const perRow = nCells > 8 ? 5 : 4;
+  const fillers = (perRow - (nCells % perRow)) % perRow;
+
   const monthName = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
 
   return (
     <div className="space-y-4">
-      {/* Header sem frase motivacional */}
-      <div className="card-lg flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-4">
-          <AvatarUploader name={seller.name} initialUrl={seller.avatar_url} color={color} />
-          <div>
-            <div className="flex items-center gap-2">
-              <BULogo bu={bu} size={18} />
-              <span className="text-xs uppercase tracking-wider text-white/50">{BU_LABEL[bu]}</span>
-            </div>
-            <div className="text-xl xl:text-2xl font-bold mt-1">
-              Ola, {seller.name.split(" ")[0]}
-            </div>
+      {/* Cabecalho numa linha (o Meu Painel junta o antigo painel e a Gamificacao) */}
+      <div className="panel px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <AvatarUploader name={seller.name} initialUrl={seller.avatar_url} color={color} />
+        <div className="min-w-0">
+          <div className="font-display text-lg font-bold leading-tight truncate">Ola, {seller.name.split(" ")[0]}</div>
+          <div className="flex items-center gap-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-white/45">
+            <BULogo bu={bu} size={14} />
+            {BU_LABEL[bu]} · {monthName}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
           {bus.length > 1 && (
-            <div className="inline-flex p-1 rounded-xl bg-panel border border-border">
+            <div className="inline-flex p-1 rounded-xl bg-panel2 border border-border">
               {bus.map((b) => (
                 <Link
                   key={b}
                   href={`/seller?bu=${b}`}
                   scroll={false}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                  className={`px-3 py-1 rounded-lg font-ui text-[11px] font-bold uppercase tracking-[0.1em] transition ${
                     b === bu ? "bg-accent text-black" : "text-white/60 hover:text-white"
                   }`}
                 >
@@ -126,26 +130,27 @@ export default async function MyPanel({
               ))}
             </div>
           )}
-          <ChangePasswordButton
-            sellerName={seller.name}
-            hasPassword={Boolean(seller.has_password)}
-          />
+          <ChangePasswordButton sellerName={seller.name} hasPassword={Boolean(seller.has_password)} />
         </div>
       </div>
 
-      {/* Indicadores (esquerda) + evolucao diaria com ritmo (direita), como no dash da BU */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        <section className="panel overflow-hidden xl:col-span-5 2xl:col-span-4">
-          <div className="-ml-px -mt-px grid grid-cols-2">
+      {/* Esquerda: minha meta (indicadores em 2 linhas) + evolucao diaria.
+          Direita: minha comissao, do topo ate embaixo (o que o vendedor mais olha). */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
+      <div className="xl:col-span-6 min-w-0 flex flex-col gap-4">
+      <section>
+        <div className="mb-1.5 px-1 eyebrow-label">Minha meta</div>
+        <div className="panel overflow-hidden">
+          <div className={`-ml-px -mt-px grid grid-cols-2 ${nCells > 8 ? "md:grid-cols-5" : "md:grid-cols-4"} [&_.cell]:!p-3 [&_.cell_.font-display]:!text-[clamp(1.05rem,1.15vw,1.45rem)]`}>
             {/* Meta principal + barra de progresso (substitui "Quanto falta pra minha meta") */}
-            <div className="col-span-2">
+            <div>
               <Cell
                 label={isQtd ? "Matriculas (real / meta)" : "Total vendido (real / meta)"}
                 value={fmtMeta(stats.realizado)}
                 tone={COLOR.neutral}
               >
                 <div className="mt-1">
-                  <ProgressBar value={stats.pctSucesso} color={pctTone} height={8} />
+                  <ProgressBar value={stats.pctSucesso} color={pctTone} height={6} />
                 </div>
                 <div className="mt-1.5">
                   Meta <b className="text-white/70">{fmtMeta(stats.metaTotal)}</b>
@@ -163,7 +168,7 @@ export default async function MyPanel({
             </div>
 
             {isQtd && (
-              <div className="col-span-2">
+              <div>
                 <Cell label="Faturamento (real / meta)" value={BRL.format(stats.valorRealizado)} tone={COLOR.neutral}>
                   <div className="mt-1">
                     <ProgressBar value={pctFat} color={pctFatTone} height={6} />
@@ -221,24 +226,14 @@ export default async function MyPanel({
                   ? `Meta ${fmtInt.format(stats.qtdMeta)} (${fmtPct((stats.qtdRealizada / stats.qtdMeta) * 100)})`
                   : "Sem meta de matriculas"}
               </Cell>
-            ) : (
-              <div className="cell min-w-0" aria-hidden />
-            )}
+            ) : null}
+            {Array.from({ length: fillers }, (_, i) => <div key={`f${i}`} className="cell max-md:hidden" aria-hidden />)}
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="panel p-5 xl:col-span-7 2xl:col-span-8 min-w-0 flex flex-col">
-          <div className="flex items-end justify-between flex-wrap gap-2 mb-3">
-            <div>
-              <div className="eyebrow-label">Minha evolucao diaria</div>
-              <div className="text-xs text-white/45 mt-1">
-                {isQtd ? "Matriculas" : "Vendas"} por dia, leads e % da minha meta acumulada
-                <span className="capitalize"> · {monthName}</span>
-              </div>
-            </div>
-            <div className="text-[10px] uppercase tracking-wider text-white/35">Tracejado = ritmo ideal ate o fim do mes</div>
-          </div>
-          <div className="flex-1 min-h-0">
+        <section className="panel p-4 min-w-0 flex-1 flex flex-col">
+          <div className="eyebrow-label mb-2">Evolucao diaria</div>
             <UnifiedDailyChart
               data={chartRows}
               leftUnit={isQtd ? "int" : "currency"}
@@ -246,7 +241,7 @@ export default async function MyPanel({
               rightPercentScale
               showIdealReference
               today={todayDayOfMonth(year, month)}
-              height={440}
+              height="fill"
               series={[
                 { key: isQtd ? "qtd" : "valor", label: isQtd ? "Matriculas (dia)" : "Minhas vendas (dia)", color, axis: "left", unit: isQtd ? "int" : "currency", strokeWidth: 2.5 },
                 { key: "leads", label: "Leads (dia)", color: COLOR.info, axis: "left", unit: "int", strokeWidth: 2 },
@@ -254,9 +249,11 @@ export default async function MyPanel({
                 { key: "idealPct", label: "% Ideal", color: COLOR.warning, axis: "right", unit: "percent", dashed: true, strokeWidth: 1.5 },
               ]}
             />
-          </div>
         </section>
-
+      </div>
+        <div className="xl:col-span-6 min-w-0">
+          <MinhaComissao seller={seller} bu={bu} color={color} year={year} month={month} />
+        </div>
       </div>
     </div>
   );

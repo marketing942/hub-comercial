@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
-// A aba "Visao Geral" foi removida — redireciona pra Vendedores pra nao
-// quebrar bookmarks nem redirecionamentos (middleware/login) que ainda
-// apontam pra /admin.
+// /admin abre a Gestao a Vista (carrossel com o GAV primeiro). Configuracoes fica
+// na engrenagem do topo.
 export default function AdminIndex() {
-  redirect("/admin/sellers");
+  redirect("/dashboard");
 }

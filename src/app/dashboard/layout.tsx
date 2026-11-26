@@ -1,7 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { getSeller } from "@/lib/data";
 import AppShell from "@/components/AppShell";
-import NewSaleNotifier from "@/components/NewSaleNotifier";
 import type { SidebarItem } from "@/components/Sidebar";
 import { redirect } from "next/navigation";
 
@@ -12,29 +11,15 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const seller = !isAdmin && s.sellerId ? await getSeller(s.sellerId) : null;
 
   const items: SidebarItem[] = isAdmin
-    ? [
-        { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
-        // GAV: so admin. Hoje tem a Gestao a Vista (faturamento da empresa).
-        { href: "/admin/gav", label: "Gestão a Vista", icon: "chart" },
-        {
-          href: "/admin/sellers",
-          label: "Configuracoes",
-          icon: "settings",
-          activePrefixes: ["/admin/goals", "/admin/comissoes", "/admin/leads", "/admin/ano", "/admin/classificacao"],
-        },
-      ]
+    ? [{ href: "/dashboard", label: "Gestão à Vista", icon: "trophy" }]
     : [
-        { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
+        { href: "/dashboard", label: "Gestão à Vista", icon: "trophy" },
         { href: "/seller", label: "Meu Painel", icon: "dashboard" },
-        { href: "/seller/gamification", label: "Gamificacao", icon: "game" },
       ];
 
   return (
     <AppShell role={s.role} sellerName={seller?.name} items={items}>
       {children}
-      {/* Notificacao comemorativa quando uma venda nova entra. Fica no
-          layout do /dashboard pra aparecer em todos os slides. */}
-      <NewSaleNotifier />
     </AppShell>
   );
 }

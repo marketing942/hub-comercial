@@ -120,52 +120,39 @@ export default function AvatarUploader({
     router.refresh();
   }
 
+  // Compacto (cabecalho do Meu Painel): so a foto, com a camera para trocar e a
+  // lixeira para remover. A foto e reduzida/otimizada automaticamente no envio.
   return (
-    <div className="flex items-center gap-3">
-      <div className="relative">
-        <Avatar name={name} url={url} color={color} size={56} />
+    <div className="relative shrink-0" title={err || undefined}>
+      <Avatar name={name} url={url} color={color} size={44} />
+      <button
+        onClick={pick}
+        disabled={busy !== null}
+        className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-accent text-black grid place-items-center shadow-lg hover:opacity-90 disabled:opacity-50"
+        title="Trocar foto (pode mandar a imagem normal, a gente reduz)"
+        aria-label="Trocar foto"
+      >
+        {busy === "upload" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
+      </button>
+      {url && (
         <button
-          onClick={pick}
+          onClick={remove}
           disabled={busy !== null}
-          className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-accent text-black grid place-items-center shadow-lg hover:opacity-90 disabled:opacity-50"
-          title="Trocar foto"
+          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-panel2 border border-border text-white/60 grid place-items-center hover:text-danger disabled:opacity-50"
+          title="Remover foto"
+          aria-label="Remover foto"
         >
-          {busy === "upload" ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Camera className="w-3.5 h-3.5" />
-          )}
+          {busy === "remove" ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Trash2 className="w-2.5 h-2.5" />}
         </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          className="hidden"
-          onChange={onFile}
-        />
-      </div>
-      <div className="text-xs text-white/60">
-        <div className="text-white text-sm font-medium">Sua foto</div>
-        <div className="leading-snug max-sm:hidden">
-          A foto e redimensionada automaticamente. Pode mandar a sua imagem normal,
-          a gente reduz e otimiza pra voce.
-        </div>
-        {url && (
-          <button
-            onClick={remove}
-            disabled={busy !== null}
-            className="mt-1 text-danger hover:underline inline-flex items-center gap-1"
-          >
-            {busy === "remove" ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Trash2 className="w-3 h-3" />
-            )}
-            Remover foto
-          </button>
-        )}
-        {err && <div className="text-danger mt-1">{err}</div>}
-      </div>
+      )}
+      {err && <div className="absolute left-0 top-full mt-1 w-56 text-[11px] text-danger">{err}</div>}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={onFile}
+      />
     </div>
   );
 }

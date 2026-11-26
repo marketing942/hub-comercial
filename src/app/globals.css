@@ -105,6 +105,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* Estilo TV / fullscreen */
 .tv-mode .kpi-num { font-size: 1.25rem; }
+/* Barras duplas (realizado x meta): altura vem de --h; na TV crescem 30% no GAV. */
+.barra-dupla { height: var(--h, 18px); }
+.tv-mode .gav .barra-dupla { height: calc(var(--h, 18px) * 1.3); }
+.tv-mode .gav .barra-dupla > span { font-size: 13px !important; }
+/* GAV em tela cheia: o grafico usa a altura que sobra e o card da empresa cresce junto. */
+.tv-mode .gav .gav-grafico { height: 40vh !important; }
+/* Numeros do card "Receita da empresa": o tamanho segue a LARGURA DO CARD (cqi),
+   nao a da tela — assim nunca cortam, em qualquer monitor ou TV. */
+.gav-empresa { container-type: inline-size; }
+.gav-empresa .gav-num { font-size: clamp(1rem, 5.4cqi, 2rem); }
+.gav-empresa .gav-mini { font-size: clamp(0.85rem, 3.6cqi, 1.1rem); }
+.tv-mode .gav .gav-num { font-size: clamp(1.1rem, 6cqi, 2.6rem); }
+.tv-mode .gav .gav-mini { font-size: clamp(0.95rem, 3.8cqi, 1.3rem); }
 .tv-mode .big-num { font-size: 2rem; line-height: 1.05; }
 .tv-mode .app-topbar, .tv-mode .gav-subnav { display: none !important; }
 .tv-mode main { max-width: 100% !important; padding: 1rem 1.25rem !important; }
@@ -179,6 +192,4 @@ html.has-crosshair, html.has-crosshair * { cursor: none !important; }
   .table-stack td[colspan] { display: block; text-align: center; }
   .table-stack td > input, .table-stack td > select { flex: 1 1 auto; min-width: 0; width: auto; }
   .table-stack td > .flex { justify-content: flex-end; }
-  /* no maximo 2 avisos de venda empilhados no celular */
-  .sale-toasts > :nth-last-child(n+3) { display: none; }
 }

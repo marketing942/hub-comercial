@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, Settings, X } from "lucide-react";
 
 export type SidebarItem = {
   href: string;
@@ -11,6 +11,10 @@ export type SidebarItem = {
   // Outros prefixos de rota que tambem marcam esse item como ativo
   activePrefixes?: string[];
 };
+
+// Telas de Configuracoes (admin): a engrenagem ao lado do Sair fica ativa nelas.
+export const CONFIG_HREF = "/admin/sellers";
+const CONFIG_PREFIXES = ["/admin/sellers", "/admin/goals", "/admin/comissoes", "/admin/leads", "/admin/ano", "/admin/classificacao", "/admin/gav/conexao"];
 
 // Navegacao no topo: libera toda a largura da tela pro dashboard (TV).
 export default function Sidebar({
@@ -23,14 +27,13 @@ export default function Sidebar({
   items: SidebarItem[];
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   useEffect(() => setOpen(false), [pathname]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    window.location.assign("/login"); // limpa o Router Cache da conta que saiu
   }
 
   const isActive = (it: SidebarItem) =>
@@ -38,13 +41,14 @@ export default function Sidebar({
     (it.href !== "/" && pathname.startsWith(it.href + "/")) ||
     (it.activePrefixes || []).some((p) => pathname === p || pathname.startsWith(p + "/"));
 
+  const configAtiva = CONFIG_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
   const who = sellerName || (role === "admin" ? "Admin" : "Vendedor");
 
   return (
     <header className="app-topbar sticky top-0 z-50 border-b border-[var(--hair)] bg-bg/80 backdrop-blur-xl">
       <div className="mx-auto max-w-[1800px] h-14 px-4 sm:px-6 flex items-center gap-8">
         <Link
-          href={role === "admin" ? "/admin" : "/dashboard"}
+          href="/dashboard"
           className="font-display font-bold tracking-[0.14em] text-[15px] uppercase whitespace-nowrap"
         >
           Hub de <span className="text-accent">Receita</span>
@@ -72,6 +76,16 @@ export default function Sidebar({
             </span>
             <span className="font-semibold">{who}</span>
           </div>
+          {role === "admin" && (
+            <Link
+              href={CONFIG_HREF}
+              title="Configuracoes"
+              aria-label="Configuracoes"
+              className={`btn-ghost h-9 w-9 !p-0 ${configAtiva ? "!text-accent !border-accent/60" : ""}`}
+            >
+              <Settings className="w-4 h-4" />
+            </Link>
+          )}
           <button onClick={logout} className="btn-ghost !py-1.5 !px-3 text-xs max-sm:!px-2.5" title="Sair">
             <LogOut className="w-3.5 h-3.5" /> Sair
           </button>

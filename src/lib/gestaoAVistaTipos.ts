@@ -79,20 +79,24 @@ export type GestaoMes = {
   anual: boolean;
   /** Faturamento da empresa no mes (todas as linhas do Conta Azul). */
   total: number;
+  /** Meta de receita da empresa no periodo: soma de TODAS as metas por linha (ca_metas_linha). */
+  metaTotal: number;
+  /** Meta por BU (soma das metas por linha de cada BU). */
+  metaPorBu: Record<BuKey, number>;
+  /** Realizado por BU. */
+  porBu: Record<BuKey, number>;
   porOrigem: Record<Origem, number>;
+  /**
+   * Meta por origem — AUTOMATICA, derivada das metas por linha (ver
+   * `distribuirMetaPorOrigem` em gestaoAVista.ts). Soma exatamente `metaTotal`.
+   */
+  metaPorOrigem: Record<Origem, number>;
   /** Parte da Diretoria/Grupo que conta para vendedor mas chegou sem dono. */
   semDono: number;
   dias: DiaGestao[];
   categorias: LinhaCategoria[];
-  /**
-   * Conferencia com o Conta Azul: soma das VENDAS faturadas/aprovadas do mes no
-   * espelho (`ca_vendas.total`). `null` = nao deu para ler. A diferenca para o
-   * `total` desta tela sao itens marcados "ignorar" e vendas sem item.
-   */
-  conferencia: { caTotal: number } | null;
   /** A tabela `ca_linha_receita` ainda nao existe (rodar supabase/ca-03-linha-receita.sql). */
   semTabela: boolean;
-  sync: { em: string | null; erro: string | null };
 };
 
 export const vazioOrigem = (): Record<Origem, number> => ({ vendedores: 0, direto: 0, diretoria: 0 });

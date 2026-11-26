@@ -9,15 +9,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (s.role !== "admin") redirect("/dashboard");
 
   const items: SidebarItem[] = [
-    { href: "/dashboard", label: "Dashboard TV", icon: "trophy" },
-    // GAV: so admin. Hoje tem a Gestao a Vista (faturamento da empresa).
-    { href: "/admin/gav", label: "Gestão a Vista", icon: "chart" },
-    {
-      href: "/admin/sellers",
-      label: "Configuracoes",
-      icon: "settings",
-      activePrefixes: ["/admin/goals", "/admin/comissoes", "/admin/leads", "/admin/ano", "/admin/classificacao"],
-    },
+    // Gestao a Vista = o carrossel (/dashboard). O 1o slide e o GAV (so admin).
+    // Configuracoes virou a engrenagem ao lado do Sair (Sidebar.tsx).
+    { href: "/dashboard", label: "Gestão à Vista", icon: "trophy" },
   ];
 
   return (

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
-// O Painel do GAV foi removido: o Dashboard TV (/dashboard) ja le o Conta Azul
-// (FONTE_PADRAO em src/lib/fonte.ts). O GAV agora so tem a Gestao a Vista.
-export default function GavIndex() {
-  redirect("/admin/gav/gestao");
+// A Gestao a Vista virou o 1o slide (GAV) do carrossel em /dashboard.
+export default function Redirecionar() {
+  redirect("/dashboard");
 }

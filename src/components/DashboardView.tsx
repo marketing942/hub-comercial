@@ -108,6 +108,43 @@ export default function DashboardView({
     fmt: fmtMeta, zero: isQtd ? "0" : "R$ 0,00",
   };
 
+  const isUni = bu === "unicive";
+  // Sublinhas: a metrica secundaria da BU dentro da mesma celula.
+  const subDia = isQtd ? (
+    <SubMeta
+      rotulo="R$"
+      meta={BRL.format(t.metaDiaValor)}
+      feito={BRL.format(t.valorHoje)}
+      falta={BRL.format(Math.max(0, t.metaDiaValor - t.valorHoje))}
+      ok={t.metaDiaValor <= 0 || t.valorHoje >= t.metaDiaValor}
+    />
+  ) : isUni ? (
+    <SubMeta
+      rotulo="Matric."
+      meta={fmtInt.format(Math.round(t.metaDiaQtd))}
+      feito={fmtInt.format(Math.round(t.qtdHoje))}
+      falta={fmtInt.format(Math.max(0, Math.round(t.metaDiaQtd - t.qtdHoje)))}
+      ok={t.metaDiaQtd <= 0 || t.qtdHoje >= t.metaDiaQtd}
+    />
+  ) : null;
+  const subSemana = !t.weekActive ? null : isQtd && t.weekTargetValor > 0 ? (
+    <SubMeta
+      rotulo="R$"
+      meta={BRL.format(t.weekTargetValor)}
+      feito={BRL.format(t.weekRealValor)}
+      falta={BRL.format(t.weekRemainingValor)}
+      ok={t.weekRealValor >= t.weekTargetValor}
+    />
+  ) : isUni && t.weekTargetQtd > 0 ? (
+    <SubMeta
+      rotulo="Matric."
+      meta={fmtInt.format(Math.round(t.weekTargetQtd))}
+      feito={fmtInt.format(Math.round(t.weekRealQtd))}
+      falta={fmtInt.format(Math.round(t.weekRemainingQtd))}
+      ok={t.weekRealQtd >= t.weekTargetQtd}
+    />
+  ) : null;
+
   const ritmo = (
     <>
       {isQtd && (
@@ -117,13 +154,6 @@ export default function DashboardView({
             Meta <b className="text-white/70">{BRL.format(t.metaValor)}</b>
             <span className="mx-1.5 text-white/25">·</span>
             <b style={{ color: pctFatTone }}>{fmtPct(pctFat)}</b>
-          </div>
-          <div className="mt-0.5">
-            {pctFat >= 100 ? (
-              <b style={{ color: COLOR.ok }}>Meta batida</b>
-            ) : (
-              <>Faltam <b style={{ color: pctFatTone }}>{BRL.format(faltaFat)}</b></>
-            )}
           </div>
           <PaceProjInfo
             paceDelta={paceValor.paceDelta}
@@ -135,29 +165,36 @@ export default function DashboardView({
           />
         </Cell>
       )}
-      <DayCell {...dayMain} />
-      {isQtd && (
-        <DayCell
-          label="Meta do dia (faturamento)"
-          meta={BRL.format(t.metaDiaValor)}
-          hoje={BRL.format(t.valorHoje)}
-          falta={BRL.format(Math.max(0, t.metaDiaValor - t.valorHoje))}
-          ok={(t.valorHoje >= t.metaDiaValor && t.metaDiaValor > 0) || Math.abs(t.valorHoje - t.metaDiaValor) < 0.01 || t.metaValor === 0 || t.metaDiaValor <= 0}
-          zero="R$ 0,00"
-        />
+      {isUni && (
+        <Cell
+          label="Matriculas"
+          value={`${fmtInt.format(t.qtd)} / ${fmtInt.format(t.metaQtd)}`}
+          tone={COLOR.neutral}
+        >
+          <div className="mt-1">
+            <ProgressBar
+              value={t.metaQtd > 0 ? (t.qtd / t.metaQtd) * 100 : 0}
+              color={t.metaQtd > 0 && t.qtd >= t.metaQtd ? COLOR.ok : COLOR.gold}
+              height={6}
+            />
+          </div>
+          <div className="mt-1.5">
+            {t.metaQtd > 0 ? fmtPct((t.qtd / t.metaQtd) * 100) : "—"}
+            {" · "}
+            {t.metaQtd > 0 && t.qtd >= t.metaQtd ? "Meta batida" : `Faltam ${fmtInt.format(Math.max(0, t.metaQtd - t.qtd))}`}
+          </div>
+          <PaceProjInfo
+            paceDelta={paceQtd.paceDelta}
+            paceIsAhead={paceQtd.paceIsAhead}
+            hasMeta={paceQtd.hasMeta}
+            projecao={paceQtd.projecao}
+            pctProjecao={paceQtd.pctProjecao}
+            fmt={(n) => fmtInt.format(Math.round(n))}
+          />
+        </Cell>
       )}
-      <WeekCell {...weekMain} />
-      {isQtd && (
-        <WeekCell
-          label="Meta da semana (faturamento)"
-          active={t.weekActive}
-          target={t.weekTargetValor}
-          real={t.weekRealValor}
-          remaining={t.weekRemainingValor}
-          fmt={(n: number) => BRL.format(n)}
-          zero="R$ 0,00"
-        />
-      )}
+      <DayCell {...dayMain} sub={subDia} />
+      <WeekCell {...weekMain} sub={subSemana} />
       <Cell label="Ticket medio" value={BRL.format(t.ticketReal)} tone={ticketTone}>
         {t.ticketMeta > 0 ? <>Meta {BRL.format(t.ticketMeta)}</> : "Sem meta"}
       </Cell>
@@ -212,15 +249,7 @@ export default function DashboardView({
         </section>
 
         <section className="panel p-5 xl:col-span-7 2xl:col-span-8 min-w-0 flex flex-col">
-          <div className="flex items-end justify-between flex-wrap gap-2 mb-3">
-            <div>
-              <div className="eyebrow-label">Evolucao diaria</div>
-              <div className="text-xs text-white/45 mt-1">
-                {isQtd ? "Matriculas" : "Vendas"} por dia, leads e % da meta acumulada
-              </div>
-            </div>
-            <div className="text-[10px] uppercase tracking-wider text-white/35">Tracejado = ritmo ideal ate o fim do mes</div>
-          </div>
+          <div className="eyebrow-label mb-2">Evolucao diaria</div>
           <div className="flex-1 min-h-0">
           <UnifiedDailyChart
             data={buildUnifiedRows(series.daily, series.cumulative)}
@@ -241,63 +270,13 @@ export default function DashboardView({
         </section>
       </div>
 
-      {/* 2) Ritmo: faixa unica com o que muda dia a dia */}
+      {/* 2) Ritmo: UMA faixa so em todas as BUs (a metrica secundaria vai como sublinha) */}
       <section className="panel overflow-hidden">
-        <div className={`-ml-px -mt-px grid grid-cols-2 md:grid-cols-3 ${isQtd ? "xl:grid-cols-4" : "xl:grid-cols-5"}`}>
+        <div className={`-ml-px -mt-px grid grid-cols-2 md:grid-cols-3 ${isQtd || isUni ? "xl:grid-cols-6" : "xl:grid-cols-5"}`}>
           {ritmo}
         </div>
       </section>
 
-      {/* Unicive: matriculas (secundaria) numa segunda faixa */}
-      {bu === "unicive" && (
-        <section className="panel overflow-hidden">
-          <div className="-ml-px -mt-px grid grid-cols-1 md:grid-cols-3">
-            <Cell
-              label="Matriculas (real / meta)"
-              value={`${fmtInt.format(t.qtd)} / ${fmtInt.format(t.metaQtd)}`}
-              tone={COLOR.neutral}
-            >
-              <div className="mt-1">
-                <ProgressBar
-                  value={t.metaQtd > 0 ? (t.qtd / t.metaQtd) * 100 : 0}
-                  color={t.metaQtd > 0 && t.qtd >= t.metaQtd ? COLOR.ok : COLOR.gold}
-                  height={6}
-                />
-              </div>
-              <div className="mt-1.5">
-                {t.metaQtd > 0 ? fmtPct((t.qtd / t.metaQtd) * 100) : "—"}
-                {" · "}
-                {t.metaQtd > 0 && t.qtd >= t.metaQtd ? "Meta batida" : `Faltam ${fmtInt.format(Math.max(0, t.metaQtd - t.qtd))}`}
-              </div>
-              <PaceProjInfo
-                paceDelta={paceQtd.paceDelta}
-                paceIsAhead={paceQtd.paceIsAhead}
-                hasMeta={paceQtd.hasMeta}
-                projecao={paceQtd.projecao}
-                pctProjecao={paceQtd.pctProjecao}
-                fmt={(n) => fmtInt.format(Math.round(n))}
-              />
-            </Cell>
-            <DayCell
-              label="Meta do dia (matriculas)"
-              meta={fmtInt.format(Math.round(t.metaDiaQtd))}
-              hoje={fmtInt.format(Math.round(t.qtdHoje))}
-              falta={fmtInt.format(Math.max(0, Math.round(t.metaDiaQtd - t.qtdHoje)))}
-              ok={(t.qtdHoje >= t.metaDiaQtd && t.metaDiaQtd > 0) || Math.abs(t.qtdHoje - t.metaDiaQtd) < 0.5 || t.metaQtd === 0 || t.metaDiaQtd <= 0}
-              zero="0"
-            />
-            <WeekCell
-              label="Meta da semana (matriculas)"
-              active={t.weekActive}
-              target={t.weekTargetQtd}
-              real={t.weekRealQtd}
-              remaining={t.weekRemainingQtd}
-              fmt={(n: number) => fmtInt.format(Math.round(n))}
-              zero="0"
-            />
-          </div>
-        </section>
-      )}
 
       {/*
         3) Receita por categoria — MESMO card nas três BUs desde 2026-11-23.
@@ -387,6 +366,7 @@ function DayCell({
   falta,
   ok,
   zero,
+  sub,
 }: {
   label: string;
   meta: string;
@@ -394,12 +374,14 @@ function DayCell({
   falta: string;
   ok: boolean;
   zero: string;
+  sub?: React.ReactNode;
 }) {
   return (
     <Cell label={label} value={meta} tone={COLOR.warning}>
       Hoje <b style={{ color: ok ? COLOR.ok : COLOR.neutral }}>{hoje}</b>
       <span className="mx-1.5 text-white/25">·</span>
       Falta <b style={{ color: ok ? COLOR.ok : COLOR.danger }}>{ok ? zero : falta}</b>
+      {sub}
     </Cell>
   );
 }
@@ -412,6 +394,7 @@ function WeekCell({
   remaining,
   fmt,
   zero,
+  sub,
 }: {
   label: string;
   active: boolean;
@@ -420,11 +403,13 @@ function WeekCell({
   remaining: number;
   fmt: (n: number) => string;
   zero: string;
+  sub?: React.ReactNode;
 }) {
   if (!active || target <= 0) {
     return (
       <Cell label={label} value="—" tone={COLOR.mute}>
         {!active ? "Disponivel no mes atual" : "Sem meta definida"}
+        {active && sub}
       </Cell>
     );
   }
@@ -434,7 +419,25 @@ function WeekCell({
       Feito <b style={{ color: batida ? COLOR.ok : COLOR.neutral }}>{fmt(real)}</b>
       <span className="mx-1.5 text-white/25">·</span>
       Falta <b style={{ color: batida ? COLOR.ok : COLOR.danger }}>{batida ? zero : fmt(remaining)}</b>
+      {sub}
     </Cell>
+  );
+}
+
+/**
+ * Sublinha de uma celula de meta: a OUTRA metrica da BU (R$ no Colegio, matriculas
+ * na Unicive). Mantem a faixa de ritmo numa linha so.
+ */
+function SubMeta({ rotulo, meta, feito, falta, ok }: { rotulo: string; meta: string; feito: string; falta: string; ok: boolean }) {
+  return (
+    <div className="mt-1.5 border-t border-white/5 pt-1.5">
+      <span className="uppercase tracking-wider text-white/35">{rotulo}</span>{" "}
+      <b className="text-white/80">{meta}</b>
+      <span className="mx-1 text-white/25">·</span>
+      <b style={{ color: ok ? COLOR.ok : COLOR.neutral }}>{feito}</b>
+      <span className="mx-1 text-white/25">·</span>
+      falta <b style={{ color: ok ? COLOR.ok : COLOR.danger }}>{ok ? "0" : falta}</b>
+    </div>
   );
 }
 

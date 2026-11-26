@@ -1,10 +1,8 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Trophy, Key } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -25,7 +23,9 @@ export default function LoginPage() {
       return;
     }
     const j = await res.json().catch(() => ({}));
-    router.push(j.role === "admin" ? "/admin/sellers" : "/seller");
+    // Navegacao completa (nao router.push): limpa o Router Cache do Next, senao a
+    // barra do topo da conta anterior (ex.: admin) fica guardada e reaparece.
+    window.location.assign(j.role === "admin" ? "/dashboard" : "/seller");
   }
 
   return (

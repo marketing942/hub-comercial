@@ -18,6 +18,8 @@ import DashboardCarousel from "@/components/DashboardCarousel";
 import DashboardView from "@/components/DashboardView";
 import DirectDashboardView from "@/components/DirectDashboardView";
 import SellersGameView from "@/components/SellersGameView";
+import GavPainel from "@/components/gav/GavPainel";
+import { gestaoDoMes } from "@/lib/gestaoAVista";
 import PeriodNav from "@/components/PeriodNav";
 import { BU_LABEL } from "@/lib/brand";
 import {
@@ -33,9 +35,11 @@ import {
 import type { Fonte } from "@/lib/fonte";
 import { ALL_BUS, type BU } from "@/lib/products";
 import { getSession } from "@/lib/auth";
-import { DASHBOARD_TAG } from "@/lib/supabase";
+import { DASHBOARD_TAG, supabaseAdmin } from "@/lib/supabase";
 
-const DASHBOARD_CACHE_SECONDS = 120;
+// O cache cai sozinho a cada envio do Conta Azul (revalidateTag nas escritas);
+// o tempo so cobre o que muda com o relogio (dia corrente, ritmo).
+const DASHBOARD_CACHE_SECONDS = 300;
 
 /**
  * Cache de servidor COMPARTILHADO entre abas e TVs.
@@ -81,7 +85,7 @@ export default async function PainelDashboard({
   const allSellers = snaps.flatMap((s) => s.sellers);
 
   // Filtra os slides por role: vendedor so ve as BUs em que atua e o slide de
-  // Vendedores. Admin ve tudo (incluindo Direto / IA).
+  // Vendedores. Admin ve tudo (o Direto virou detalhe clicavel dentro do GAV).
   const session = await getSession();
   const isAdmin = session?.role === "admin";
   let allowedBus: BU[] = [...ALL_BUS];
@@ -107,25 +111,28 @@ export default async function PainelDashboard({
       ),
     }));
 
+  // GAV (Gestao a Vista da empresa): primeiro slide, so admin. Le o Conta Azul
+  // inteiro (ca_linha_receita), entao so faz sentido na fonte Conta Azul.
+  const gav = isAdmin && fonte === "conta_azul" ? await gestaoDoMes(year, month) : null;
+
   const slides = [
-    ...buSlides,
-    ...(isAdmin
+    ...(gav
       ? [
-          {
-            key: "direto",
-            label: "Direto / IA",
-            node: (
-              <DirectDashboardView
-                snap={direct}
-                day={day}
-                totalDays={totalDays}
-                daysLeft={daysLeft}
-                monthName={monthName}
-              />
-            ),
-          },
-        ]
+        {
+          key: "gav",
+          label: "GAV",
+          node: (
+            <GavPainel
+              dados={gav}
+              year={year}
+              month={month}
+              detalheDireto={<DirectDashboardView snap={direct} gav={gav} year={year} month={month} />}
+            />
+          ),
+        },
+      ]
       : []),
+    ...buSlides,
     {
       key: "sellers",
       label: "Vendedores",
@@ -141,12 +148,23 @@ export default async function PainelDashboard({
     },
   ];
 
+  // Ultimo envio do Conta Azul — lido FORA do cache, a cada render: e o horario
+  // que a tela mostra como "atualizado", entao nao pode vir velho.
+  let sync: { em: string | null; erro: string | null } = { em: null, erro: null };
+  try {
+    const { data } = await supabaseAdmin.from("ca_sync").select("concluido_em, erro").eq("recurso", "vendas").maybeSingle();
+    if (data) sync = { em: (data as any).concluido_em ?? null, erro: (data as any).erro ?? null };
+  } catch {
+    /* sem tabela: mostra "nunca" */
+  }
+
   return (
     <>
       <DashboardCarousel
+        sync={{ ...sync, link: isAdmin ? "/admin/gav/conexao" : undefined }}
         slides={slides}
         intervalSec={25}
-        refreshMs={60000}
+        refreshMs={180000}
         periodNav={<PeriodNav year={year} month={month} />}
       />
     </>

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// A aba Vendas do GAV saiu; a Gestao a Vista e a unica. Mantem o endereco antigo vivo.
-export default function VendasRedirect() {
-  redirect("/admin/gav/gestao");
+// A Gestao a Vista virou o 1o slide (GAV) do carrossel em /dashboard.
+export default function Redirecionar() {
+  redirect("/dashboard");
 }

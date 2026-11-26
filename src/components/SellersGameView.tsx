@@ -51,16 +51,6 @@ export default function SellersGameView({
 
   return (
     <div className="space-y-4">
-      {/* Header — compacto, so titulo centralizado */}
-      <div
-        className="rounded-xl py-2 px-3 border border-accent/30 text-center"
-        style={{ background: "linear-gradient(120deg, rgba(175,146,86,0.22), rgba(24,24,30,0.75))" }}
-      >
-        <h2 className="text-lg xl:text-xl font-bold tracking-tight">
-          Quadro dos Vendedores
-        </h2>
-      </div>
-
       {/* Podios apenas pra BUs com >= 2 vendedores */}
       {busWithPodium.length > 0 && (
         <section
@@ -86,10 +76,8 @@ export default function SellersGameView({
       {/* Barra do Coordenador: meta agregada CPPEM + UNICIVE (so vendedores) */}
       <CoordinatorBar stats={stats} />
 
-      {/* Cards por BU agrupados */}
-      {ALL_BUS.map((bu) => (
-        <BUGroup key={bu} bu={bu} sellers={ranks[bu]} accent={BU_COLOR[bu]} />
-      ))}
+      {/* Progresso individual: UMA tabela das 3 BUs; a BU e a borda colorida da linha */}
+      <SellersTable ranks={ranks} />
     </div>
   );
 }
@@ -162,119 +150,113 @@ function CoordinatorBar({ stats }: { stats: SellerStats[] }) {
   );
 }
 
-function BUGroup({
-  bu,
-  sellers,
-  accent,
-}: {
-  bu: BU;
-  sellers: SellerStats[];
-  accent: string;
-}) {
-  const isUni = bu === "unicive";
-  const isQtd = isQtdPrimary(bu);
-  // colunas: # | vendedor | progresso | realizado/meta | ticket | conversao | leads [| matriculas]
-  const cols = isUni
-    ? "grid-cols-[2rem_minmax(9rem,1.3fr)_minmax(8rem,1.6fr)_minmax(8rem,1fr)_5.5rem_5.5rem_3.5rem_4.5rem]"
-    : "grid-cols-[2rem_minmax(9rem,1.3fr)_minmax(8rem,1.6fr)_minmax(8rem,1fr)_5.5rem_5.5rem_3.5rem]";
+// Colunas da tabela unica: # | vendedor | progresso | realizado | meta | ticket | conversao | leads | matriculas
+const COLS =
+  "grid-cols-[2rem_minmax(11rem,1.4fr)_minmax(9rem,1.3fr)_minmax(7rem,1fr)_minmax(7rem,1fr)_minmax(6rem,.8fr)_minmax(5rem,.7fr)_4rem_4.5rem]";
+
+function SellersTable({ ranks }: { ranks: Record<BU, SellerStats[]> }) {
   const head = "font-ui text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40";
+  const grupos = ALL_BUS.filter((bu) => ranks[bu].length > 0);
   return (
     <section className="panel overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--hair)]">
-        <span className="font-display font-bold uppercase tracking-wide" style={{ color: accent }}>
-          {BU_LABEL[bu]}
-        </span>
-        <span className="text-[11px] text-white/40">
-          {sellers.length} vendedor{sellers.length === 1 ? "" : "es"}
-        </span>
-      </div>
-      {sellers.length === 0 ? (
-        <div className="px-5 py-4 text-sm text-white/60">Nenhum vendedor ativo nesta BU.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <div className="min-w-[760px]">
-            <div className={`grid ${cols} items-center gap-3 px-5 py-2 ${head}`}>
-              <span>#</span>
-              <span>Vendedor</span>
-              <span>Progresso</span>
-              <span className="text-right">{isQtd ? "Matriculas" : "Faturamento"}</span>
-              <span className="text-right">Ticket</span>
-              <span className="text-right">Conversao</span>
-              <span className="text-right">Leads</span>
-              {isUni && <span className="text-right">Matric.</span>}
-            </div>
-            {sellers.map((s, i) => (
-              <SellerRow key={`${s.sellerId}_${s.bu}`} s={s} pos={i + 1} accent={accent} cols={cols} isUni={isUni} />
-            ))}
+      <div className="overflow-x-auto">
+        <div className="min-w-[900px]">
+          <div className={`grid ${COLS} items-center gap-3 border-b border-[var(--hair)] py-2 pl-4 pr-5 ${head}`}>
+            <span>#</span>
+            <span className="flex items-center gap-3">
+              Vendedor
+              <span className="flex items-center gap-2 normal-case tracking-normal font-normal">
+                {ALL_BUS.map((bu) => (
+                  <span key={bu} className="inline-flex items-center gap-1">
+                    <i className="h-2.5 w-1 rounded-sm" style={{ background: BU_COLOR[bu] }} />
+                    {BU_LABEL[bu]}
+                  </span>
+                ))}
+              </span>
+            </span>
+            <span>Progresso</span>
+            <span className="text-right">Realizado</span>
+            <span className="text-right">Meta</span>
+            <span className="text-right">Ticket</span>
+            <span className="text-right">Conversao</span>
+            <span className="text-right">Leads</span>
+            <span className="text-right">Matric.</span>
           </div>
+          {grupos.map((bu, gi) =>
+            ranks[bu].map((s, i) => (
+              <SellerRow
+                key={`${s.sellerId}_${s.bu}`}
+                s={s}
+                pos={i + 1}
+                accent={BU_COLOR[bu]}
+                inicioGrupo={i === 0 && gi > 0}
+              />
+            )),
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
 
-function SellerRow({
-  s,
-  pos,
-  accent,
-  cols,
-  isUni,
-}: {
-  s: SellerStats;
-  pos: number;
-  accent: string;
-  cols: string;
-  isUni: boolean;
-}) {
+function SellerRow({ s, pos, accent, inicioGrupo }: { s: SellerStats; pos: number; accent: string; inicioGrupo: boolean }) {
   const isQtd = isQtdPrimary(s.bu);
-  const fmtP = (n: number) => (isQtd ? fmtInt.format(Math.round(n)) : BRL.format(n));
+  const fmtP = (n: number) => (isQtd ? `${fmtInt.format(Math.round(n))} mat.` : BRL.format(n));
   const st = statusFor(s.pctSucesso, s.gap);
   const meta = STATUS_META[st];
   const ticketTone = s.ticketMeta > 0 ? (s.ticketReal >= s.ticketMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
   const convTone = s.conversaoMeta > 0 ? (s.conversaoReal >= s.conversaoMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
+  const sub = "text-[10px] text-white/40";
   return (
-    <div className={`grid ${cols} items-center gap-3 px-5 py-3 border-t border-[var(--hair)] hover:bg-white/[0.02] transition`}>
+    <div
+      className={`grid ${COLS} items-center gap-3 py-2 pl-3 pr-5 hover:bg-white/[0.02] transition ${
+        inicioGrupo ? "border-t-2 border-white/10" : "border-t border-[var(--hair)] first:border-t-0"
+      }`}
+      style={{ borderLeft: `4px solid ${accent}` }}
+    >
       <span className="font-display font-bold text-white/35">{pos}</span>
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
         <div className="relative shrink-0">
-          <Avatar name={s.sellerName} url={s.avatarUrl} color={s.avatarColor || accent} size={34} />
+          <Avatar name={s.sellerName} url={s.avatarUrl} color={s.avatarColor || accent} size={30} />
           {st === "atrasado" && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={PANICO_BADGE}
               alt="Bata a meta ou sera abatido"
               title="Bata a meta ou sera abatido"
-              className="absolute -top-3 -right-4 w-7 h-7 object-contain rotate-[14deg] pointer-events-none select-none"
+              className="absolute -top-3 -right-4 w-6 h-6 object-contain rotate-[14deg] pointer-events-none select-none"
             />
           )}
         </div>
         <div className="min-w-0 leading-tight">
           <div className="text-sm font-semibold truncate">{s.sellerName}</div>
-          <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: meta.color }}>
+          <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: meta.color }}>
             {meta.label}
           </div>
         </div>
       </div>
-      <div className="min-w-0">
-        <div className="flex items-center justify-between text-xs mb-1.5">
-          <span className="font-display font-bold text-base" style={{ color: meta.color }}>{fmtPct(s.pctSucesso)}</span>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="w-14 shrink-0 font-display font-bold tabular-nums" style={{ color: meta.color }}>
+          {fmtPct(s.pctSucesso)}
+        </span>
+        <div className="flex-1 min-w-0">
+          <ProgressBar value={s.pctSucesso} color={meta.color} height={5} />
         </div>
-        <ProgressBar value={s.pctSucesso} color={meta.color} height={6} />
       </div>
-      <div className="text-right leading-tight">
-        <div className="text-sm font-semibold">{fmtP(s.realizado)}</div>
-        <div className="text-[10px] text-white/40">de {fmtP(s.metaTotal)}</div>
-      </div>
-      <div className="text-right leading-tight">
+      <div className="text-right text-sm font-semibold tabular-nums truncate">{fmtP(s.realizado)}</div>
+      <div className="text-right text-sm tabular-nums text-white/60 truncate">{fmtP(s.metaTotal)}</div>
+      <div className="text-right leading-tight tabular-nums">
         <div className="text-sm font-semibold" style={{ color: ticketTone }}>{BRL.format(s.ticketReal)}</div>
-        <div className="text-[10px] text-white/40">{s.ticketMeta > 0 ? `meta ${BRL.format(s.ticketMeta)}` : "sem meta"}</div>
+        <div className={sub}>{s.ticketMeta > 0 ? `meta ${BRL.format(s.ticketMeta)}` : "sem meta"}</div>
       </div>
-      <div className="text-right leading-tight">
+      <div className="text-right leading-tight tabular-nums">
         <div className="text-sm font-semibold" style={{ color: convTone }}>{fmtPct(s.conversaoReal)}</div>
-        <div className="text-[10px] text-white/40">{s.conversaoMeta > 0 ? `meta ${fmtPct(s.conversaoMeta)}` : "sem meta"}</div>
+        <div className={sub}>{s.conversaoMeta > 0 ? `meta ${fmtPct(s.conversaoMeta)}` : "sem meta"}</div>
       </div>
-      <div className="text-right text-sm font-semibold">{fmtInt.format(s.leads)}</div>
-      {isUni && <div className="text-right text-sm font-semibold">{fmtInt.format(s.qtdRealizada)}</div>}
+      <div className="text-right text-sm font-semibold tabular-nums">{fmtInt.format(s.leads)}</div>
+      <div className="text-right text-sm font-semibold tabular-nums">
+        {s.bu === "cppem" ? <span className="text-white/25">—</span> : fmtInt.format(s.qtdRealizada)}
+      </div>
     </div>
   );
 }
