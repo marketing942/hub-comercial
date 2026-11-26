@@ -110,7 +110,7 @@ async function metasAntigas(bu: BU, year: number, month: number, cats: { id: str
     if (!p) continue;
     if (p.product_line && porLinha.has(p.product_line)) {
       out.set(c.id, porLinha.get(p.product_line)!);
-    } else if (bu === "colegio_cppem" && !p.product_line && p.conta_vendedor && /MATRICULA/.test(normalizar(c.nome).toUpperCase())) {
+    } else if (bu === "colegio_cppem" && !p.product_line && p.conta_vendedor && /\bMATRICULA/.test(normalizar(c.nome).toUpperCase())) {
       let valor = 0;
       let qtd = 0;
       for (const id of COLEGIO_MATRICULAS_IDS as readonly string[]) {

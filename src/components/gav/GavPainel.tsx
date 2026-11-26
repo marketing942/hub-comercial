@@ -49,7 +49,7 @@ const tom = tomRitmo;
 function nomeCurto(nome: string): string {
   const s = nome
     .replace(/^\s*\d+(\.\d+)*\s*-\s*/, "")
-    .replace(/\s+(CPPEM|UNICIVE|COL[EÉ]GIO(\s+CPPEM)?)\s*$/i, "")
+    .replace(/\s+(D[OE]\s+)?(CPPEM|UNICIVE|COL[EÉ]GIO(\s+CPPEM)?)\s*$/i, "")
     .trim();
   return s || nome;
 }
@@ -68,7 +68,8 @@ const ORDEM_LINHAS: { bu?: string; casa: (n: string) => boolean }[] = [
   { bu: "cppem", casa: (n) => n.startsWith("SUPLETIVO") },
   { bu: "unicive", casa: (n) => n.startsWith("MATRICULA") },
   { casa: (n) => n.includes("REPASSE") },
-  { bu: "colegio_cppem", casa: (n) => n.startsWith("MATRICULA") },
+  { bu: "colegio_cppem", casa: (n) => n.startsWith("MATRICULA") && !n.includes("REMATR") },
+  { bu: "colegio_cppem", casa: (n) => n.includes("REMATR") },
   { bu: "colegio_cppem", casa: (n) => n.startsWith("MENSALIDADE") },
   { bu: "colegio_cppem", casa: (n) => n.startsWith("FARDAMENTO") },
   { casa: (n) => n.startsWith("EVENTOS") },

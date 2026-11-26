@@ -27,6 +27,7 @@
  */
 import { supabaseAdmin } from "@/lib/supabase";
 import { buListOf, listSellers } from "@/lib/data";
+import { categoriaDecide } from "./categoriaReceita";
 import { situacaoConta } from "./config";
 import { lerPorChaves, lerTudo } from "./ler";
 import { LINHAS_VENDEDOR, linhaValida } from "./linhas";
@@ -259,7 +260,9 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
         const itMapa2 = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
         const nome = catMapa2?.nome || (catId ? `Categoria ${catId.slice(0, 8)}` : "Sem categoria no Conta Azul");
         const palpite = !catMapa2?.bu && !catMapa2?.ignorar ? palpitarCategoria(catMapa2?.nome ?? null) : null;
-        const itemFechado = !!(itMapa2 && (itMapa2.ignorar || itMapa2.product_line));
+        // Eventos e Rematricula: a categoria classificada vale mais que o item.
+        const pelaCategoria = !!catMapa2?.bu && categoriaDecide(catMapa2.nome);
+        const itemFechado = !pelaCategoria && !!(itMapa2 && (itMapa2.ignorar || itMapa2.product_line));
         const ignorarFato = itemFechado ? itMapa2!.ignorar : !!(catMapa2?.ignorar || palpite?.ignorar);
         if (!ignorarFato) {
           const buFato = (itemFechado ? itMapa2!.bu : catMapa2?.bu || palpite?.bu) || null;
@@ -317,12 +320,17 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
 
       // Item tem a palavra final quando classificado; categoria é a rede embaixo.
       const itMapa = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
-      const escolhido: MapaLinha | undefined =
+      let escolhido: MapaLinha | undefined =
         itMapa && !itMapa.ignorar && itMapa.product_line
           ? itMapa
           : itMapa?.ignorar
             ? itMapa
             : catMapa;
+
+      // Eventos e Rematricula: o item da a linha (a serie), a categoria diz se conta.
+      if (escolhido && catMapa?.bu && categoriaDecide(catMapa.nome)) {
+        escolhido = { ...escolhido, conta_vendedor: catMapa.conta_vendedor, ignorar: catMapa.ignorar };
+      }
 
       if (!escolhido || escolhido.ignorar) {
         if (escolhido?.ignorar) r.ignorados++;

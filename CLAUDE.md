@@ -154,6 +154,12 @@ Raios: cartões **6px** (`.panel`, `.card`, `.card-lg`, modais; mais quadrados d
 - **Desempenho**: `src/lib/ca/mapa.ts` lê `ca_vendas` e `ca_venda_itens` **uma vez**, em paralelo, e agrega tudo numa passada (`agregarEspelho`, `unstable_cache` 5 min, tag `ca-espelho`, invalidada por `gravarEspelho` a cada sync). A classificação é aplicada em memória por cima (antes eram 4 leituras de `ca_vendas` e 3 de itens, em série, a cada abertura e a cada salvar). Só entra no agregado o que **não** depende da classificação.
 - **GAV — barras segmentadas e gráfico (26/11/2026)**: Por BU, as 3 origens (agora barras lado a lado embaixo da receita total, não mais tabela) e as Linhas de receita usam a **barra de progresso segmentada** (`gav/BarraSegmentada.tsx`): uma barra só, dourado (`DOURADO_REALIZADO`) = realizado e vermelho apagado (`COR_FALTA`) = falta; embaixo “Realizado R$ …” e “Falta R$ …” (ou “Acima +R$”, verde; ou “sem meta”). O “Acumulado × ritmo da meta” é o **mesmo `UnifiedDailyChart` da Evolução diária** (faturamento do dia, % da meta acumulada, % ideal por dias úteis, projeção); altura pela variável CSS `--gav-graf-h` (300px; 190px no modo TV). `GavGrafico` foi apagado. As duas barras (`DuasBarras`/`BarraBala`) ficaram só no detalhe do Direto.
 
+## 11.1 Categorias novas do Conta Azul (26/11/2026: Eventos e Rematrícula)
+
+- O Jarvis manda o cadastro inteiro sem tipo; o Hub aceita como receita a numerada `1.x`/`2.x` (menos “a identificar”, rendimentos e empréstimos) ou nome “(Re)matrícula …” — `lib/ca/categoriaReceita.ts`. Categoria usada em venda entra sempre.
+- Nessas duas categorias (`categoriaDecide`: nome com “Evento” ou “Rematrícula”) quem decide “conta para o vendedor” é a **categoria**, não o item: os itens são os mesmos de Turmas/Matrícula.
+- Ordem do GAV: Rematrícula logo depois de Matrícula Colégio; Eventos antes de Multas.
+
 ## 12. Configurações — mudanças de 26/11/2026
 
 - **Metas**: a meta de longo prazo (multi-mês) do Colégio saiu do sistema. O botão “Copiar mês anterior” saiu.

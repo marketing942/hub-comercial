@@ -62,6 +62,12 @@ const REGRAS: { quando: RegExp; bu: string; linha: string; conta: boolean; ignor
   { quando: /LIVRO/, bu: "colegio_cppem", linha: "", conta: false, porque: "livros não contam para vendedor" },
   { quando: /EVENTO.*COLEGIO/, bu: "colegio_cppem", linha: "", conta: false, porque: "evento do Colégio não conta para vendedor" },
 
+  // Rematrícula e eventos do CPPEM: categorias próprias desde 26/11/2026. Antes
+  // estavam dentro de Matrícula e de Turmas, que contam — o palpite mantém isso.
+  // (REMATR precisa vir antes de MATRICULA, que também casaria.)
+  { quando: /REMATRICULA/, bu: "colegio_cppem", linha: "", conta: true, porque: "rematrícula do Colégio" },
+  { quando: /EVENTO(?!.*COLEGIO)/, bu: "cppem", linha: "eventos", conta: true, porque: "eventos do CPPEM" },
+
   // Matrícula: é o que conta para o vendedor.
   // O Colégio fica SEM linha de propósito: são 12 séries e só o nome do item
   // diz qual. A linha sai do item (ver §4 do documento).
@@ -92,7 +98,7 @@ export function palpitarCategoria(nome: string | null): PalpiteCategoria | null 
     }
   }
   // Sem regra: pelo menos a BU, que o nome quase sempre diz.
-  const bu = n.includes("UNICIVE") ? "unicive" : n.includes("COLEGIO") ? "colegio_cppem" : n.includes("CPPEM") ? "cppem" : "";
+  const bu = n.includes("UNICIVE") ? "unicive" : n.includes("COLEGIO") ? "colegio_cppem" : /CP+EM/.test(n) ? "cppem" : "";
   return bu ? { bu, product_line: "", conta_vendedor: false, ignorar: false, porque: "BU pelo nome; a linha precisa de decisão" } : null;
 }
 

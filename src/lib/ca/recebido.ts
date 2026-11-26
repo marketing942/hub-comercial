@@ -15,6 +15,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { revalidateTag } from "next/cache";
 import { lerTudo } from "./ler";
+import { ehCategoriaDeReceita, nomeDaCategoria } from "./categoriaReceita";
 import { TAG_ESPELHO } from "./mapa";
 
 export interface ResultadoEspelho {
@@ -166,18 +167,16 @@ export async function gravarEspelho(
    */
   const usadas = new Set(vendas.map((v) => v.categoria_ca_id).filter(Boolean) as string[]);
   /**
-   * Alem das usadas nas vendas da janela, TODA categoria de RECEITA do Conta Azul
-   * (codigo "1", "1.5", "1.9"...): receita sem venda na janela — como o repasse da
-   * mensalidade da Unicive — nao aparecia na Classificacao, e nao da para
-   * classificar o que nao se ve. Despesa (codigo "2...") continua de fora.
+   * Alem das usadas nas vendas da janela, TODA categoria de RECEITA do Conta Azul,
+   * mesmo sem venda: nao da para classificar nem dar meta ao que nao se ve.
+   * A regra vive em `./categoriaReceita.ts`.
    */
-  const ehReceita = (c: Record<string, unknown>) => /^1(\.|\s|$)/.test(txt(c?.codigo) ?? "");
   const categorias = (categoriasRaw as Record<string, unknown>[])
-    .filter((c) => txt(c?.ca_id) && (usadas.has(txt(c.ca_id)!) || ehReceita(c)))
+    .filter((c) => txt(c?.ca_id) && (usadas.has(txt(c.ca_id)!) || ehCategoriaDeReceita(txt(c.codigo), txt(c.nome))))
     .map((c) => ({
       ca_tipo: "categoria" as const,
       ca_id: txt(c.ca_id)!,
-      ca_nome: [txt(c.codigo), txt(c.nome)].filter(Boolean).join(" - ") || null,
+      ca_nome: nomeDaCategoria(txt(c.codigo), txt(c.nome)),
     }))
     .filter((c) => c.ca_nome);
 

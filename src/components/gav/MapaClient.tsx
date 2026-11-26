@@ -19,7 +19,7 @@
  * resposta no dia em que alguém lançar um lote errado, e muda em silêncio.
  */
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
 
 import { COLOR } from "@/lib/brand";
@@ -71,6 +71,15 @@ export default function MapaClient({
   // A aba "Vendedores" foi para Configuracoes -> Vendedores (26/11/2026): a ligacao
   // cadastro do Conta Azul -> vendedor do Hub fica junto do cadastro do vendedor.
   const [aba, setAba] = useState<"categorias" | "itens">("categorias");
+  // Busca a lista fresca ao abrir e ao voltar para a janela: o Router Cache do Next
+  // reaproveitava a pagina antiga e categoria nova do Conta Azul nao aparecia.
+  const router = useRouter();
+  useEffect(() => {
+    const atualizar = () => router.refresh();
+    atualizar();
+    window.addEventListener("focus", atualizar);
+    return () => window.removeEventListener("focus", atualizar);
+  }, [router]);
   // Categoria classificada = tem BU (ou foi ignorada). A linha de receita E a propria categoria.
   const pendentesCat = categorias.filter((c) => !c.bu && !c.ignorar).length;
   /**
@@ -409,6 +418,12 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
             />
             ignorar
           </label>
+          {/* Aceitar a sugestao sem mexer em nada: sem este botao nao havia como gravar. */}
+          {ehCat && pendente && !salvo && (bu || ignorar) ? (
+            <button type="button" onClick={() => void salvar()} disabled={salvando} className="btn btn-primary !px-2 !py-1 text-[11px]">
+              Confirmar
+            </button>
+          ) : null}
           <span className="min-w-[4.5rem] text-[11px]" style={{ color: erro ? COLOR.danger : COLOR.ok }}>
             {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
           </span>
