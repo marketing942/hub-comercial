@@ -29,14 +29,10 @@ export type UnifiedChartRow = {
   [k: string]: string | number | undefined;
 };
 
-// Paleta sobria: neutro para o volume do dia, UMA linha dourada para o acumulado,
-// cinza para referencias (ritmo, meta, hoje). A unica cor de resultado
-// (verde/vermelho) fica no ponto de HOJE, que e o sinal que importa.
 const GOLD = "#c9ae7a";
-const GRID = "rgba(255,255,255,0.06)";
+const GRID = "#2d2c3a";
 const MUTED = "#87847a";
-const REF = "#8f8b80";
-const BAR = "rgba(201,174,122,0.32)"; // dourado translucido, como as barras do GAV
+const WARN = "#f0b44c";
 const OK = "#5fd08f";
 const DANGER = "#ee7d73";
 
@@ -98,10 +94,10 @@ function ChartTooltip({
       <div style={{ color: GOLD, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", fontSize: 11 }}>
         Dia {label}
       </div>
-      {main && typeof row[main.key] === "number" && line(main.label, formatValue(main.unit, Number(row[main.key])), "rgba(201,174,122,0.5)")}
-      {leads && typeof row[leads.key] === "number" && line(leads.label, formatValue(leads.unit, Number(row[leads.key])), MUTED)}
-      {pct && pctV !== null && line("% da meta acumulada", fmtPct(pctV), GOLD)}
-      {ideal && idealV !== null && line("Ritmo ideal", fmtPct(idealV), REF)}
+      {main && typeof row[main.key] === "number" && line(main.label, formatValue(main.unit, Number(row[main.key])), main.color)}
+      {leads && typeof row[leads.key] === "number" && line(leads.label, formatValue(leads.unit, Number(row[leads.key])), leads.color)}
+      {pct && pctV !== null && line(pct.label, fmtPct(pctV), pct.color)}
+      {ideal && idealV !== null && line(ideal.label, fmtPct(idealV), ideal.color)}
       {gap !== null && (
         <div
           style={{
@@ -124,7 +120,7 @@ function LegendItem({ color, label, kind }: { color: string; label: string; kind
     kind === "bar" ? (
       <i style={{ width: 10, height: 10, borderRadius: 2, background: color, display: "inline-block" }} />
     ) : kind === "area" ? (
-      <i style={{ width: 16, height: 3, borderRadius: 2, background: color, display: "inline-block" }} />
+      <i style={{ width: 16, height: 3, borderRadius: 2, background: color, display: "inline-block", boxShadow: `0 0 8px ${color}` }} />
     ) : (
       <i
         style={{
@@ -197,27 +193,33 @@ export default function UnifiedDailyChart({
   const todayLabel = todayIdx !== null ? data[todayIdx]?.day : undefined;
   const lastLabel = data[data.length - 1]?.day;
   const pctColor = pct?.color ?? DANGER;
+  const barColor = main?.color ?? GOLD;
 
   const fill = height === "fill";
   return (
     <div className={fill ? "flex flex-col h-full" : undefined}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", fontSize: 11, marginBottom: 8 }}>
-        {pct && <LegendItem kind="area" color={GOLD} label="% da meta acumulada" />}
-        {ideal && <LegendItem kind="dash" color={REF} label="Ritmo ideal" />}
-        {projectedEnd !== null && <LegendItem kind="dot" color={GOLD} label="Projeção" />}
-        {main && <LegendItem kind="bar" color="rgba(201,174,122,0.5)" label={main.label} />}
+        {main && <LegendItem kind="bar" color={barColor} label={main.label} />}
+        {pct && <LegendItem kind="area" color={pctColor} label={pct.label} />}
+        {ideal && <LegendItem kind="dash" color={WARN} label={ideal.label} />}
+        {projectedEnd !== null && <LegendItem kind="dash" color={pctColor} label="Projeção no ritmo atual" />}
+        {leads && <LegendItem kind="dot" color={leads.color} label={leads.label} />}
       </div>
 
       <div className={fill ? "flex-1 min-h-[280px] max-h-[62vh]" : "max-sm:!h-[300px]"} style={fill ? undefined : { height }}>
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={{ top: 18, left: 0, right: hasRight ? 8 : 0, bottom: 4 }} barCategoryGap="22%">
             <defs>
+              <linearGradient id="udc_bar" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={barColor} stopOpacity={0.95} />
+                <stop offset="100%" stopColor={barColor} stopOpacity={0.25} />
+              </linearGradient>
               <linearGradient id="udc_pct" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={GOLD} stopOpacity={0.14} />
-                <stop offset="100%" stopColor={GOLD} stopOpacity={0} />
+                <stop offset="0%" stopColor={pctColor} stopOpacity={0.38} />
+                <stop offset="100%" stopColor={pctColor} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke={GRID} vertical={false} />
+            <CartesianGrid stroke={GRID} strokeDasharray="3 5" vertical={false} />
             <XAxis
               dataKey="day"
               stroke={MUTED}
@@ -260,22 +262,21 @@ export default function UnifiedDailyChart({
             {leads && <YAxis yAxisId="leads" hide domain={[0, (m: number) => Math.ceil(m * 1.15)]} />}
 
             <Tooltip
-              cursor={{ fill: "rgba(255,255,255,0.03)" }}
+              cursor={{ stroke: GOLD, strokeOpacity: 0.35, strokeDasharray: "3 4" }}
               content={<ChartTooltip main={main} leads={leads} pct={pct} ideal={ideal} />}
             />
 
             {showIdealReference && hasRight && (
-              <ReferenceLine y={100} yAxisId="right" stroke={REF} strokeOpacity={0.6}
-                label={{ value: "META 100%", position: "insideTopLeft", fill: REF, fontSize: 10, fontWeight: 700 }} />
+              <ReferenceLine y={100} yAxisId="right" stroke={WARN} strokeDasharray="3 4" strokeOpacity={0.5}
+                label={{ value: "META", position: "insideTopLeft", fill: WARN, fontSize: 10, fontWeight: 700 }} />
             )}
             {todayLabel && (
               <ReferenceLine
                 x={todayLabel}
                 yAxisId="left"
-                stroke={REF}
-                strokeOpacity={0.35}
-                strokeDasharray="2 3"
-                label={{ value: "HOJE", position: "top", fill: MUTED, fontSize: 10, fontWeight: 700 }}
+                stroke={GOLD}
+                strokeOpacity={0.55}
+                label={{ value: "HOJE", position: "top", fill: GOLD, fontSize: 10, fontWeight: 700 }}
               />
             )}
 
@@ -284,10 +285,25 @@ export default function UnifiedDailyChart({
                 yAxisId="left"
                 dataKey={main.key}
                 name={main.label}
-                fill={BAR}
-                radius={[3, 3, 0, 0]}
-                maxBarSize={22}
+                fill="url(#udc_bar)"
+                radius={[5, 5, 0, 0]}
+                maxBarSize={26}
                 isAnimationActive={false}
+              />
+            )}
+            {leads && (
+              <Line
+                yAxisId="leads"
+                type="linear"
+                dataKey={leads.key}
+                name={leads.label}
+                stroke={leads.color}
+                strokeOpacity={0.55}
+                strokeWidth={1.5}
+                strokeDasharray="1 4"
+                strokeLinecap="round"
+                dot={false}
+                connectNulls
               />
             )}
             {ideal && (
@@ -296,10 +312,10 @@ export default function UnifiedDailyChart({
                 type="linear"
                 dataKey={ideal.key}
                 name={ideal.label}
-                stroke={REF}
-                strokeOpacity={0.9}
+                stroke={WARN}
+                strokeOpacity={0.8}
                 strokeWidth={1.5}
-                strokeDasharray="5 5"
+                strokeDasharray="4 4"
                 dot={false}
               />
             )}
@@ -309,10 +325,10 @@ export default function UnifiedDailyChart({
                 type="linear"
                 dataKey="proj"
                 name="Projeção"
-                stroke={GOLD}
-                strokeOpacity={0.5}
+                stroke={pctColor}
+                strokeOpacity={0.7}
                 strokeWidth={2}
-                strokeDasharray="1 5"
+                strokeDasharray="2 5"
                 strokeLinecap="round"
                 dot={false}
                 activeDot={false}
@@ -324,11 +340,12 @@ export default function UnifiedDailyChart({
                 type="monotone"
                 dataKey={pct.key}
                 name={pct.label}
-                stroke={GOLD}
-                strokeWidth={2.5}
+                stroke={pctColor}
+                strokeWidth={3}
                 fill="url(#udc_pct)"
                 dot={false}
-                activeDot={{ r: 4, stroke: "#0e0e14", strokeWidth: 2, fill: GOLD }}
+                activeDot={{ r: 5, stroke: "#0e0e14", strokeWidth: 2, fill: pctColor }}
+                style={{ filter: `drop-shadow(0 0 7px ${pctColor}aa)` }}
                 connectNulls={false}
               />
             )}
@@ -352,9 +369,9 @@ export default function UnifiedDailyChart({
                 yAxisId="right"
                 r={4}
                 fill="#0e0e14"
-                stroke={GOLD}
+                stroke={pctColor}
                 strokeWidth={2}
-                label={{ value: `Proj. ${projectedEnd.toFixed(0)}%`, position: "top", fill: MUTED, fontSize: 11, fontWeight: 700 }}
+                label={{ value: `Proj. ${projectedEnd.toFixed(0)}%`, position: "top", fill: pctColor, fontSize: 11, fontWeight: 700 }}
               />
             )}
           </ComposedChart>

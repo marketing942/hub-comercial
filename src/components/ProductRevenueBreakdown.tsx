@@ -70,7 +70,6 @@ export default function ProductRevenueBreakdown({
             const pct = r.valor_meta > 0 ? pctValor : pctQtd;
             const hasMeta = r.valor_meta > 0 || r.quantidade_meta > 0;
             const tone = !hasMeta ? COLOR.neutral : pct >= 100 ? COLOR.ok : COLOR.neutral;
-            const barTone = hasMeta && pct >= 100 ? COLOR.ok : COLOR.gold;
             const vendas = r.vendas ?? [];
 
             const corpo = (
@@ -93,9 +92,9 @@ export default function ProductRevenueBreakdown({
                 </div>
                 <div className="mt-1.5">
                   {r.valor_meta > 0 || r.quantidade_meta <= 0 ? (
-                    <DuasBarras real={r.valor} meta={r.valor_meta} cor={barTone} />
+                    <DuasBarras real={r.valor} meta={r.valor_meta} cor={COLOR.gold} />
                   ) : (
-                    <DuasBarras real={r.qtd} meta={r.quantidade_meta} cor={barTone} fmt={(v) => `${fmtInt.format(v)} un`} />
+                    <DuasBarras real={r.qtd} meta={r.quantidade_meta} cor={COLOR.gold} fmt={(v) => `${fmtInt.format(v)} un`} />
                   )}
                 </div>
               </>

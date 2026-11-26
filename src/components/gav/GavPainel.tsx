@@ -270,7 +270,7 @@ export default function GavPainel({
                               </span>
                               <span className="shrink-0 text-[12px] font-bold tabular-nums" style={{ color: cl }}>{tm ? fmtPct(pl) : "sem meta"}</span>
                             </div>
-                            <DuasBarras real={l.valor} meta={l.metaValor} cor={tm ? cl : COLOR.gold} altura={22} />
+                            <DuasBarras real={l.valor} meta={l.metaValor} cor={COLOR.gold} altura={22} />
                           </div>
                         );
                       })}

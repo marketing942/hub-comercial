@@ -20,8 +20,7 @@ export default function ReceitaCategoriasCA({ rows }: { rows: CategoriaCA[] }) {
         {rows.map((r) => {
           const temMeta = r.meta_valor > 0;
           const pct = temMeta ? (r.valor / r.meta_valor) * 100 : 0;
-          const cor = !temMeta ? COLOR.gold : pct >= 100 ? COLOR.ok : COLOR.gold;
-          return (
+                    return (
             <div key={r.id} className="min-w-0 rounded-xl bg-panel2/60 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[13px] font-semibold truncate">{r.nome}</div>
@@ -30,7 +29,7 @@ export default function ReceitaCategoriasCA({ rows }: { rows: CategoriaCA[] }) {
                 </div>
               </div>
               <div className="mt-1.5">
-                <DuasBarras real={r.valor} meta={r.meta_valor} cor={cor} />
+                <DuasBarras real={r.valor} meta={r.meta_valor} cor={COLOR.gold} />
               </div>
             </div>
           );
