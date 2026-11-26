@@ -14,7 +14,7 @@ export default async function LeadsPage() {
       <div>
         <h1 className="text-2xl font-bold">Leads recebidos</h1>
         <p className="text-sm text-white/50">
-          Atualize diariamente quantos leads cada vendedor recebeu. Eles entram no calculo de taxa de conversao.
+          Informe o total de leads que cada vendedor recebeu no mes ate agora. Alimenta a conversao, o pace e a projecao de leads.
         </p>
       </div>
       <LeadsClient sellers={sellers} defaultYear={year} defaultMonth={month} />

@@ -14,9 +14,12 @@ export default function DetalheOrigem({
   titulo,
   gatilho,
   children,
+  inline,
 }: {
   titulo: string;
   gatilho: ReactNode;
+  /** Gatilho pequeno, em linha com o texto (ex.: "detalhes ›"). */
+  inline?: boolean;
   children: ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
@@ -38,7 +41,11 @@ export default function DetalheOrigem({
         type="button"
         onClick={() => setAberto(true)}
         title={`Ver detalhes: ${titulo}`}
-        className="group -m-1.5 block w-[calc(100%+0.75rem)] min-w-0 rounded-lg p-1.5 text-left transition hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+        className={
+          inline
+            ? "inline-flex shrink-0 items-center rounded px-1 text-left"
+            : "group -m-1.5 block w-[calc(100%+0.75rem)] min-w-0 rounded-lg p-1.5 text-left transition hover:bg-white/[0.04] focus-visible:bg-white/[0.04]"
+        }
       >
         {gatilho}
       </button>
@@ -51,7 +58,7 @@ export default function DetalheOrigem({
             role="dialog"
             aria-modal="true"
             aria-label={titulo}
-            className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-panel p-4 shadow-glow"
+            className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-md border border-border bg-panel p-4 shadow-glow"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between gap-3">

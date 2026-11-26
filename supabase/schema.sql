@@ -74,6 +74,9 @@ create table if not exists public."commission_rules" (
   constraint "commission_rules_pkey" PRIMARY KEY (bu),
   constraint "commission_rules_bu_check" CHECK ((bu = ANY (ARRAY['cppem'::text, 'unicive'::text, 'colegio_cppem'::text])))
 );
+-- Comissao depois de impostos (26/11/2026; ver supabase/commission-impostos.sql).
+alter table public.commission_rules add column if not exists after_tax boolean not null default false;
+alter table public.commission_rules add column if not exists tax_pct numeric(5,2) not null default 0;
 
 create table if not exists public."commission_tiers" (
   "id" uuid default gen_random_uuid() not null,

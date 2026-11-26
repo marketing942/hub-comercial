@@ -266,10 +266,7 @@ export default function UnifiedDailyChart({
               content={<ChartTooltip main={main} leads={leads} pct={pct} ideal={ideal} />}
             />
 
-            {showIdealReference && hasRight && (
-              <ReferenceLine y={100} yAxisId="right" stroke={WARN} strokeDasharray="3 4" strokeOpacity={0.5}
-                label={{ value: "META", position: "insideTopLeft", fill: WARN, fontSize: 10, fontWeight: 700 }} />
-            )}
+            {/* A linha tracejada "META" (100%) saiu em 26/11/2026, a pedido do time. */}
             {todayLabel && (
               <ReferenceLine
                 x={todayLabel}
@@ -342,10 +339,9 @@ export default function UnifiedDailyChart({
                 name={pct.label}
                 stroke={pctColor}
                 strokeWidth={3}
-                fill="url(#udc_pct)"
+                fill="none"
                 dot={false}
                 activeDot={{ r: 5, stroke: "#0e0e14", strokeWidth: 2, fill: pctColor }}
-                style={{ filter: `drop-shadow(0 0 7px ${pctColor}aa)` }}
                 connectNulls={false}
               />
             )}

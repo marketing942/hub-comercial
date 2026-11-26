@@ -50,11 +50,11 @@ export default function SellersGameView({
   const busWithPodium = ALL_BUS.filter((bu) => ranks[bu].length >= 2);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Podios apenas pra BUs com >= 2 vendedores */}
       {busWithPodium.length > 0 && (
         <section
-          className={`grid grid-cols-1 gap-4 ${
+          className={`grid grid-cols-1 gap-2 ${
             busWithPodium.length === 1
               ? ""
               : busWithPodium.length === 2

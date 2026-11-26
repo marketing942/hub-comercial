@@ -4,17 +4,19 @@ export default function AppShell({
   role,
   sellerName,
   items,
+  extra,
   children,
 }: {
   role: "admin" | "seller";
   sellerName?: string;
   items: SidebarItem[];
+  extra?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <Sidebar role={role} sellerName={sellerName} items={items} />
-      <main className="mx-auto w-full max-w-[1800px] px-4 sm:px-6 py-5">{children}</main>
+      <Sidebar role={role} sellerName={sellerName} items={items} extra={extra} />
+      <main className="mx-auto w-full max-w-[1800px] px-3 sm:px-4 py-4">{children}</main>
     </div>
   );
 }

@@ -1,12 +1,10 @@
 import type { DashboardSnapshot } from "@/lib/data";
 import { BRL, fmtInt, fmtPct, paceProjection } from "@/lib/calc";
-import { BU_COLOR, BU_LABEL, COLOR, tonePctMeta } from "@/lib/brand";
+import { BU_COLOR, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary } from "@/lib/products";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
-import ProductRevenueBreakdown from "@/components/ProductRevenueBreakdown";
-import ReceitaCategoriasCA from "@/components/ReceitaCategoriasCA";
 import LongTermGoalCard from "@/components/LongTermGoalCard";
-import ProgressBar from "@/components/ProgressBar";
+import Indicador, { type Linha } from "@/components/Indicador";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function DashboardView({
@@ -22,7 +20,7 @@ export default function DashboardView({
   daysLeft: number;
   monthName: string;
 }) {
-  const { bu, series, sellers, leadsTotal, taxaConversao, breakdown } = snap;
+  const { bu, series, sellers, leadsTotal, taxaConversao } = snap;
   const isQtd = isQtdPrimary(bu);
   const color = BU_COLOR[bu];
   const t = series.totals;
@@ -35,38 +33,16 @@ export default function DashboardView({
 
   // Faturamento (Unicive / Colegio importam tambem)
   const pctFat = t.metaValor > 0 ? (t.valor / t.metaValor) * 100 : 0;
-  const faltaFat = Math.max(0, t.metaValor - t.valor);
-  const pctFatTone = tonePctMeta(pctFat, 0);
 
   // Meta do dia
   const metaDia = t.metaDia;
   const realHoje = t.realizadoHoje;
   const faltaHoje = Math.max(0, metaDia - realHoje);
-  const diff = realHoje - metaDia;
-  const vencendo = realHoje >= metaDia && metaDia > 0;
-  const empate = Math.abs(diff) < (isQtd ? 0.5 : 0.01);
   const semMeta = metaDia <= 0 || t.meta === 0;
-  const placarColor = semMeta
-    ? COLOR.mute
-    : empate
-    ? COLOR.warning
-    : vencendo
-    ? COLOR.ok
-    : COLOR.danger;
-  const placarLabel = semMeta
-    ? "Sem meta definida"
-    : pct >= 100
-    ? "Meta do mes batida"
-    : empate
-    ? "No ritmo do dia"
-    : vencendo
-    ? "Vencendo o dia"
-    : "Atras no dia";
 
   const totalVendas = sellers.reduce((a, b) => a + b.vendasCount, 0);
   const leadsMeta = t.leadsMeta;
   const leadsPct = leadsMeta > 0 ? (leadsTotal / leadsMeta) * 100 : 0;
-  const leadsTone = leadsMeta > 0 ? (leadsTotal >= leadsMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
 
   // ==== Pace + Projecao ====
   // Total Vendido usa a metrica primaria da BU (R$ pra CPPEM/UNI, qtd pra Colegio)
@@ -93,134 +69,115 @@ export default function DashboardView({
         : COLOR.danger
       : COLOR.neutral;
 
-  // ---- Meta do dia / da semana: dados prontos por variante ----
-  const dayMain = {
-    label: isQtd ? "Meta do dia (matriculas)" : "Meta do dia",
-    meta: fmtMeta(metaDia),
-    hoje: fmtMeta(realHoje),
-    falta: fmtMeta(faltaHoje),
-    ok: vencendo || empate || semMeta,
-    zero: isQtd ? "0" : "R$ 0,00",
-  };
-  const weekMain = {
-    label: isQtd ? "Meta da semana (matriculas)" : "Meta da semana",
-    active: t.weekActive, target: t.weekTarget, real: t.weekReal, remaining: t.weekRemaining,
-    fmt: fmtMeta, zero: isQtd ? "0" : "R$ 0,00",
-  };
-
+  // ---- Faixa de indicadores: TODAS as celulas no mesmo padrao (25/11/2026) ----
+  // Rotulo · numero principal (sempre o REALIZADO, unico com cor) · linhas
+  // "rotulo ... valor" sem cor. Cor: verde = bateu/no ritmo, vermelho = atras,
+  // branco = em andamento ou sem meta. Sem barras de progresso.
   const isUni = bu === "unicive";
-  // Sublinhas: a metrica secundaria da BU dentro da mesma celula.
-  const subDia = isQtd ? (
-    <SubMeta
-      rotulo="R$"
-      meta={BRL.format(t.metaDiaValor)}
-      feito={BRL.format(t.valorHoje)}
-      falta={BRL.format(Math.max(0, t.metaDiaValor - t.valorHoje))}
-      ok={t.metaDiaValor <= 0 || t.valorHoje >= t.metaDiaValor}
-    />
-  ) : isUni ? (
-    <SubMeta
-      rotulo="Matric."
-      meta={fmtInt.format(Math.round(t.metaDiaQtd))}
-      feito={fmtInt.format(Math.round(t.qtdHoje))}
-      falta={fmtInt.format(Math.max(0, Math.round(t.metaDiaQtd - t.qtdHoje)))}
-      ok={t.metaDiaQtd <= 0 || t.qtdHoje >= t.metaDiaQtd}
-    />
-  ) : null;
-  const subSemana = !t.weekActive ? null : isQtd && t.weekTargetValor > 0 ? (
-    <SubMeta
-      rotulo="R$"
-      meta={BRL.format(t.weekTargetValor)}
-      feito={BRL.format(t.weekRealValor)}
-      falta={BRL.format(t.weekRemainingValor)}
-      ok={t.weekRealValor >= t.weekTargetValor}
-    />
-  ) : isUni && t.weekTargetQtd > 0 ? (
-    <SubMeta
-      rotulo="Matric."
-      meta={fmtInt.format(Math.round(t.weekTargetQtd))}
-      feito={fmtInt.format(Math.round(t.weekRealQtd))}
-      falta={fmtInt.format(Math.round(t.weekRemainingQtd))}
-      ok={t.weekRealQtd >= t.weekTargetQtd}
-    />
-  ) : null;
+  const fmtQ = (n: number) => fmtInt.format(Math.round(n));
+  const sinal = (v: number) => (v >= 0 ? "+" : "−");
+  const tomRitmoMes = (p: { hasMeta: boolean; paceIsAhead: boolean }, batida: boolean) =>
+    !p.hasMeta ? COLOR.neutral : batida || p.paceIsAhead ? COLOR.ok : COLOR.danger;
+  const linhasRitmo = (p: { hasMeta: boolean; paceDelta: number; projecao: number }, fmt: (n: number) => string): Linha[] =>
+    p.hasMeta
+      ? [
+          ["Pace", `${sinal(p.paceDelta)}${fmt(Math.abs(p.paceDelta))}`],
+          ["Projecao", fmt(p.projecao)],
+        ]
+      : [];
+
+  const hojeBatido = !semMeta && realHoje >= metaDia;
+  const linhasHoje: Linha[] = semMeta
+    ? [["Meta do dia", "Sem meta"]]
+    : [
+        ["Meta do dia", fmtMeta(metaDia)],
+        ["Falta", hojeBatido ? "Batida" : fmtMeta(faltaHoje)],
+      ];
+  if (isQtd) linhasHoje.push(["R$ hoje", `${BRL.format(t.valorHoje)} / ${BRL.format(t.metaDiaValor)}`]);
+  if (isUni) linhasHoje.push(["Matric. hoje", `${fmtQ(t.qtdHoje)} / ${fmtQ(t.metaDiaQtd)}`]);
+
+  const semanaAtiva = t.weekActive && t.weekTarget > 0;
+  const semanaBatida = semanaAtiva && t.weekReal >= t.weekTarget;
+  const linhasSemana: Linha[] = !t.weekActive
+    ? [["Meta da semana", "So no mes atual"]]
+    : !semanaAtiva
+      ? [["Meta da semana", "Sem meta"]]
+      : [
+          ["Meta da semana", fmtMeta(t.weekTarget)],
+          ["Falta", semanaBatida ? "Batida" : fmtMeta(t.weekRemaining)],
+        ];
+  if (t.weekActive && isQtd && t.weekTargetValor > 0) linhasSemana.push(["R$ semana", `${BRL.format(t.weekRealValor)} / ${BRL.format(t.weekTargetValor)}`]);
+  if (t.weekActive && isUni && t.weekTargetQtd > 0) linhasSemana.push(["Matric. semana", `${fmtQ(t.weekRealQtd)} / ${fmtQ(t.weekTargetQtd)}`]);
 
   const ritmo = (
     <>
       {isQtd && (
-        <Cell label="Faturamento" value={BRL.format(t.valor)} tone={COLOR.neutral}>
-          <div className="mt-1"><ProgressBar value={pctFat} color={pctFatTone} height={6} /></div>
-          <div className="mt-1.5">
-            Meta <b className="text-white/70">{BRL.format(t.metaValor)}</b>
-            <span className="mx-1.5 text-white/25">·</span>
-            <b style={{ color: pctFatTone }}>{fmtPct(pctFat)}</b>
-          </div>
-          <PaceProjInfo
-            paceDelta={paceValor.paceDelta}
-            paceIsAhead={paceValor.paceIsAhead}
-            hasMeta={paceValor.hasMeta}
-            projecao={paceValor.projecao}
-            pctProjecao={paceValor.pctProjecao}
-            fmt={(n) => BRL.format(n)}
-          />
-        </Cell>
+        <Indicador
+          label="Faturamento"
+          value={BRL.format(t.valor)}
+          tone={tomRitmoMes(paceValor, t.metaValor > 0 && t.valor >= t.metaValor)}
+          linhas={[
+            ["Meta", t.metaValor > 0 ? `${BRL.format(t.metaValor)} · ${fmtPct(pctFat)}` : "Sem meta"],
+            ...linhasRitmo(paceValor, (n) => BRL.format(n)),
+          ]}
+        />
       )}
       {isUni && (
-        <Cell
+        <Indicador
           label="Matriculas"
-          value={`${fmtInt.format(t.qtd)} / ${fmtInt.format(t.metaQtd)}`}
-          tone={COLOR.neutral}
-        >
-          <div className="mt-1">
-            <ProgressBar
-              value={t.metaQtd > 0 ? (t.qtd / t.metaQtd) * 100 : 0}
-              color={t.metaQtd > 0 && t.qtd >= t.metaQtd ? COLOR.ok : COLOR.gold}
-              height={6}
-            />
-          </div>
-          <div className="mt-1.5">
-            {t.metaQtd > 0 ? fmtPct((t.qtd / t.metaQtd) * 100) : "—"}
-            {" · "}
-            {t.metaQtd > 0 && t.qtd >= t.metaQtd ? "Meta batida" : `Faltam ${fmtInt.format(Math.max(0, t.metaQtd - t.qtd))}`}
-          </div>
-          <PaceProjInfo
-            paceDelta={paceQtd.paceDelta}
-            paceIsAhead={paceQtd.paceIsAhead}
-            hasMeta={paceQtd.hasMeta}
-            projecao={paceQtd.projecao}
-            pctProjecao={paceQtd.pctProjecao}
-            fmt={(n) => fmtInt.format(Math.round(n))}
-          />
-        </Cell>
-      )}
-      <DayCell {...dayMain} sub={subDia} />
-      <WeekCell {...weekMain} sub={subSemana} />
-      <Cell label="Ticket medio" value={BRL.format(t.ticketReal)} tone={ticketTone}>
-        {t.ticketMeta > 0 ? <>Meta {BRL.format(t.ticketMeta)}</> : "Sem meta"}
-      </Cell>
-      <Cell label="Conversao" value={fmtPct(taxaConversao)} tone={convTone}>
-        {convMetaBU > 0 ? <>Meta {fmtPct(convMetaBU)}</> : "Sem meta"}
-      </Cell>
-      <Cell label="Leads no mes" value={fmtInt.format(leadsTotal)} tone={leadsTone}>
-        {leadsMeta > 0 ? <>Meta {fmtInt.format(leadsMeta)} <b className="text-white/70">{fmtPct(leadsPct)}</b></> : "Sem meta"}
-        <PaceProjInfo
-          paceDelta={paceLeads.paceDelta}
-          paceIsAhead={paceLeads.paceIsAhead}
-          hasMeta={paceLeads.hasMeta}
-          projecao={paceLeads.projecao}
-          pctProjecao={paceLeads.pctProjecao}
-          fmt={(n) => fmtInt.format(Math.round(n))}
+          value={fmtQ(t.qtd)}
+          tone={tomRitmoMes(paceQtd, t.metaQtd > 0 && t.qtd >= t.metaQtd)}
+          linhas={[
+            ["Meta", t.metaQtd > 0 ? `${fmtQ(t.metaQtd)} · ${fmtPct((t.qtd / t.metaQtd) * 100)}` : "Sem meta"],
+            ...linhasRitmo(paceQtd, fmtQ),
+          ]}
         />
-      </Cell>
+      )}
+      <Indicador
+        label={isQtd ? "Hoje (matriculas)" : "Vendido hoje"}
+        value={fmtMeta(realHoje)}
+        tone={hojeBatido ? COLOR.ok : COLOR.neutral}
+        linhas={linhasHoje}
+      />
+      <Indicador
+        label={isQtd ? "Semana (matriculas)" : "Vendido na semana"}
+        value={t.weekActive ? fmtMeta(t.weekReal) : "—"}
+        tone={semanaBatida ? COLOR.ok : COLOR.neutral}
+        linhas={linhasSemana}
+      />
+      <Indicador
+        label="Ticket medio"
+        value={BRL.format(t.ticketReal)}
+        tone={ticketTone}
+        linhas={[["Meta", t.ticketMeta > 0 ? BRL.format(t.ticketMeta) : "Sem meta"]]}
+      />
+      <Indicador
+        label="Conversao"
+        value={fmtPct(taxaConversao)}
+        tone={convTone}
+        linhas={[
+          ["Meta", convMetaBU > 0 ? fmtPct(convMetaBU) : "Sem meta"],
+          ["Vendas / leads", `${fmtQ(totalVendas)} / ${fmtQ(leadsTotal)}`],
+        ]}
+      />
+      <Indicador
+        label="Leads no mes"
+        value={fmtQ(leadsTotal)}
+        tone={tomRitmoMes(paceLeads, leadsMeta > 0 && leadsTotal >= leadsMeta)}
+        linhas={[
+          ["Meta", leadsMeta > 0 ? `${fmtQ(leadsMeta)} · ${fmtPct(leadsPct)}` : "Sem meta"],
+          ...linhasRitmo(paceLeads, fmtQ),
+        ]}
+      />
     </>
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {snap.longTerm && <LongTermGoalCard progress={snap.longTerm} accent={color} />}
 
       {/* 1) Placar + evolucao: a historia do mes de relance */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-2">
         <section className="panel p-5 xl:col-span-5 2xl:col-span-4 flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <div className="eyebrow-label">{isQtd ? "Matriculas" : "Faturamento"}</div>
@@ -261,7 +218,6 @@ export default function DashboardView({
             height="fill"
             series={[
               { key: isQtd ? "qtd" : "valor", label: isQtd ? "Matriculas (dia)" : "Vendas (dia)", color, axis: "left", unit: isQtd ? "int" : "currency", strokeWidth: 2.5 },
-              { key: "leads", label: "Leads (dia)", color: COLOR.info, axis: "left", unit: "int", strokeWidth: 2 },
               { key: "pct", label: "% Meta acumulada", color: pctTone, axis: "right", unit: "percent", strokeWidth: 3 },
               { key: "idealPct", label: "% Ideal", color: "#f0b44c", axis: "right", unit: "percent", dashed: true, strokeWidth: 1.5 },
             ]}
@@ -278,21 +234,7 @@ export default function DashboardView({
       </section>
 
 
-      {/*
-        3) Receita por categoria — MESMO card nas três BUs desde 2026-11-23.
-        Antes cada BU tinha o seu (`UniciveCategoriasBreakdown`,
-        `ColegioTurmasBreakdown`), e quem trocava de BU trocava de linguagem
-        visual no meio da leitura. Os dois antigos continuam no repositório,
-        sem uso, porque o da Unicive trazia um total de matrículas no cabeçalho
-        que pode fazer falta — se fizer, ele volta como prop daqui.
-      */}
-      {/* Etapa 2: com dado do Conta Azul, o card usa as categorias do proprio CA e a
-          meta de cada uma (Configuracoes > Metas por linha); senao, o card por linha do Hub. */}
-      {snap.categoriasCA?.length > 0 ? (
-        <ReceitaCategoriasCA rows={snap.categoriasCA} />
-      ) : (
-        <ProductRevenueBreakdown rows={breakdown} />
-      )}
+      {/* A receita por categoria/linha fica so no GAV (25/11/2026). */}
     </div>
   );
 }
@@ -330,113 +272,6 @@ function ScoreRing({ pct, color, size = 188 }: { pct: number; color: string; siz
           <div className="mt-1 font-ui text-[11px] uppercase tracking-[0.2em] text-white/45">da meta</div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Cell({
-  label,
-  value,
-  tone,
-  children,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="cell p-4 min-w-0">
-      <div className="kpi-label leading-tight">{label}</div>
-      <div
-        className="mt-1.5 font-display font-bold leading-none truncate text-[clamp(1.25rem,1.7vw,1.75rem)]"
-        style={{ color: tone || COLOR.neutral }}
-      >
-        {value}
-      </div>
-      {children && <div className="mt-2 text-[11px] leading-snug text-white/50">{children}</div>}
-    </div>
-  );
-}
-
-function DayCell({
-  label,
-  meta,
-  hoje,
-  falta,
-  ok,
-  zero,
-  sub,
-}: {
-  label: string;
-  meta: string;
-  hoje: string;
-  falta: string;
-  ok: boolean;
-  zero: string;
-  sub?: React.ReactNode;
-}) {
-  return (
-    <Cell label={label} value={meta} tone={COLOR.warning}>
-      Hoje <b style={{ color: ok ? COLOR.ok : COLOR.neutral }}>{hoje}</b>
-      <span className="mx-1.5 text-white/25">·</span>
-      Falta <b style={{ color: ok ? COLOR.ok : COLOR.danger }}>{ok ? zero : falta}</b>
-      {sub}
-    </Cell>
-  );
-}
-
-function WeekCell({
-  label,
-  active,
-  target,
-  real,
-  remaining,
-  fmt,
-  zero,
-  sub,
-}: {
-  label: string;
-  active: boolean;
-  target: number;
-  real: number;
-  remaining: number;
-  fmt: (n: number) => string;
-  zero: string;
-  sub?: React.ReactNode;
-}) {
-  if (!active || target <= 0) {
-    return (
-      <Cell label={label} value="—" tone={COLOR.mute}>
-        {!active ? "Disponivel no mes atual" : "Sem meta definida"}
-        {active && sub}
-      </Cell>
-    );
-  }
-  const batida = real >= target;
-  return (
-    <Cell label={label} value={fmt(target)} tone={batida ? COLOR.ok : COLOR.warning}>
-      Feito <b style={{ color: batida ? COLOR.ok : COLOR.neutral }}>{fmt(real)}</b>
-      <span className="mx-1.5 text-white/25">·</span>
-      Falta <b style={{ color: batida ? COLOR.ok : COLOR.danger }}>{batida ? zero : fmt(remaining)}</b>
-      {sub}
-    </Cell>
-  );
-}
-
-/**
- * Sublinha de uma celula de meta: a OUTRA metrica da BU (R$ no Colegio, matriculas
- * na Unicive). Mantem a faixa de ritmo numa linha so.
- */
-function SubMeta({ rotulo, meta, feito, falta, ok }: { rotulo: string; meta: string; feito: string; falta: string; ok: boolean }) {
-  return (
-    <div className="mt-1.5 border-t border-white/5 pt-1.5">
-      <span className="uppercase tracking-wider text-white/35">{rotulo}</span>{" "}
-      <b className="text-white/80">{meta}</b>
-      <span className="mx-1 text-white/25">·</span>
-      <b style={{ color: ok ? COLOR.ok : COLOR.neutral }}>{feito}</b>
-      <span className="mx-1 text-white/25">·</span>
-      falta <b style={{ color: ok ? COLOR.ok : COLOR.danger }}>{ok ? "0" : falta}</b>
     </div>
   );
 }
@@ -497,7 +332,6 @@ function PaceRows({
         <span className="font-ui text-[12px] font-semibold uppercase tracking-[0.14em] text-white/45">Projecao</span>
         <span className="text-right text-[15px] font-semibold tabular-nums" style={{ color: projColor }}>
           {fmt(p.projecao)}
-          {p.hasMeta ? <span className="text-white/60"> · {fmtPct(p.pctProjecao)}</span> : null}
         </span>
       </div>
     </>
@@ -522,47 +356,4 @@ function buildUnifiedRows(
       idealPct: c ? c.idealPct : 0,
     };
   });
-}
-
-// Linha compacta de Pace + Projecao.
-function PaceProjInfo({
-  paceDelta,
-  paceIsAhead,
-  hasMeta,
-  projecao,
-  pctProjecao,
-  fmt,
-}: {
-  paceDelta: number;
-  paceIsAhead: boolean;
-  hasMeta: boolean;
-  projecao: number;
-  pctProjecao: number;
-  fmt: (n: number) => string;
-}) {
-  const paceColor = !hasMeta ? COLOR.mute : paceIsAhead ? COLOR.ok : COLOR.danger;
-  const projColor = !hasMeta ? COLOR.mute : pctProjecao >= 100 ? COLOR.ok : COLOR.danger;
-  const Arrow = paceIsAhead ? ArrowUpRight : ArrowDownRight;
-  const paceAbs = fmt(Math.abs(paceDelta));
-  return (
-    <div className="mt-1 grid grid-cols-2 gap-1.5">
-      <div className="rounded-md bg-panel2/70 px-2 py-1 flex items-center justify-between gap-1">
-        <span className="text-[9px] uppercase tracking-wider text-white/40">Pace</span>
-        <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold" style={{ color: paceColor }}>
-          {hasMeta ? (
-            <>
-              <Arrow className="w-3 h-3" />
-              {paceIsAhead ? "+" : "-"}{paceAbs}
-            </>
-          ) : "—"}
-        </span>
-      </div>
-      <div className="rounded-md bg-panel2/70 px-2 py-1 flex items-center justify-between gap-1">
-        <span className="text-[9px] uppercase tracking-wider text-white/40">Projecao</span>
-        <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: projColor }}>
-          {fmt(projecao)}{hasMeta ? ` · ${fmtPct(pctProjecao)}` : ""}
-        </span>
-      </div>
-    </div>
-  );
 }

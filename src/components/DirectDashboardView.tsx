@@ -15,9 +15,9 @@ import type { DirectSnapshot } from "@/lib/data";
 import type { GestaoMes } from "@/lib/gestaoAVistaTipos";
 import { BU_GESTAO_ROTULO, COR_BU } from "@/lib/gestaoAVistaTipos";
 import { BRL, fmtInt, fmtPct } from "@/lib/calc";
-import { COLOR } from "@/lib/brand";
 import { idealPctDoMes, tomRitmo } from "@/lib/ritmo";
 import DuasBarras, { LegendaBarras } from "@/components/DuasBarras";
+import { COR_META_GAV, COR_REAL_GAV } from "@/components/gav/BarraBala";
 
 const BRL0 = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
@@ -76,8 +76,8 @@ export default function DirectDashboardView({
           </div>
         </div>
         <div>
-          <div className="mb-1.5 flex justify-end"><LegendaBarras /></div>
-          <DuasBarras real={site.valor} meta={meta} cor={COLOR.gold} altura={28} />
+          <div className="mb-1.5 flex justify-end"><LegendaBarras cor={COR_REAL_GAV} corMeta={COR_META_GAV} /></div>
+          <DuasBarras real={site.valor} meta={meta} cor={COR_REAL_GAV} corMeta={COR_META_GAV} altura={28} />
         </div>
         <div className="grid grid-cols-3 gap-2.5">
           <Mini rotulo="Vendas" valor={fmtInt.format(site.qtd)} nota="unidades" />
@@ -99,8 +99,8 @@ export default function DirectDashboardView({
                   <i className="h-2 w-2 shrink-0 rounded-sm" style={{ background: COR_BU[l.bu] }} title={BU_GESTAO_ROTULO[l.bu]} />
                   <span className="truncate text-white/85">{l.rotulo}</span>
                 </span>
-                <div className="h-[18px] overflow-hidden rounded-[5px] bg-white/[0.05]">
-                  <div className="h-full rounded-[5px]" style={{ width: `${(l.valor / maxLinha) * 100}%`, background: COLOR.gold }} />
+                <div className="h-[18px] overflow-hidden rounded-[5px]">
+                  <div className="h-full rounded-[5px]" style={{ width: `${(l.valor / maxLinha) * 100}%`, background: COR_REAL_GAV }} />
                 </div>
                 <span className="text-right text-[13px] font-semibold tabular-nums">
                   {BRL.format(l.valor)}

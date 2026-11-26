@@ -1,7 +1,7 @@
 "use client";
 /**
  * O UNICO grafico do painel GAV: receita acumulada do mes x o ritmo que leva a
- * meta da empresa (dias uteis), com a meta como teto. As barras discretas sao o
+ * meta da empresa (dias uteis), (a linha tracejada da meta saiu em 26/11/2026; o eixo ainda vai ate a meta). As barras discretas sao o
  * faturamento de cada dia. Recharts so no navegador (ver `GavGraficoLazy`).
  */
 import {
@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -67,15 +66,6 @@ export default function GavGrafico({ pontos, meta }: { pontos: PontoGav[]; meta:
           }}
         />
         <Bar yAxisId="dia" dataKey="diario" fill={COLOR.gold} fillOpacity={0.28} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-        {meta > 0 && (
-          <ReferenceLine
-            yAxisId="acc"
-            y={meta}
-            stroke={COLOR.mute}
-            strokeDasharray="2 4"
-            label={{ value: "META", position: "insideTopLeft", fill: COLOR.mute, fontSize: 10 }}
-          />
-        )}
         {meta > 0 && (
           <Line yAxisId="acc" dataKey="ideal" stroke={COLOR.warning} strokeWidth={1.5} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
         )}

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { KeyRound, X, Check, RotateCw } from "lucide-react";
 
 export default function ChangePasswordButton({
@@ -53,18 +54,24 @@ export default function ChangePasswordButton({
 
   return (
     <>
-      <button className="btn-ghost text-xs" onClick={() => setOpen(true)}>
+      <button
+        className="btn-ghost !py-1.5 !px-3 text-xs max-sm:!px-2.5"
+        onClick={() => setOpen(true)}
+        title={hasPassword ? "Mudar minha senha" : "Definir minha senha"}
+      >
         <KeyRound className="w-3.5 h-3.5" />
-        {hasPassword ? "Mudar minha senha" : "Definir minha senha"}
+        <span className="max-sm:hidden">Senha</span>
       </button>
 
-      {open && (
+      {/* Portal no body: o botao fica na barra do topo, que tem backdrop-blur
+          (vira o "containing block" de fixed) e prenderia o modal nela. */}
+      {open && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm grid place-items-center p-3 sm:p-6"
           onClick={() => !saving && setOpen(false)}
         >
           <div
-            className="bg-panel border border-border rounded-2xl shadow-glow w-full max-w-sm overflow-hidden"
+            className="bg-panel border border-border rounded-md shadow-glow w-full max-w-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -145,7 +152,8 @@ export default function ChangePasswordButton({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

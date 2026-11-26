@@ -21,10 +21,13 @@ export default function Sidebar({
   role,
   sellerName,
   items,
+  extra,
 }: {
   role: "admin" | "seller";
   sellerName?: string;
   items: SidebarItem[];
+  /** Acoes extras antes do Sair (vendedor: foto e senha, que sairam do cabecalho do Meu Painel). */
+  extra?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -86,6 +89,7 @@ export default function Sidebar({
               <Settings className="w-4 h-4" />
             </Link>
           )}
+          {extra}
           <button onClick={logout} className="btn-ghost !py-1.5 !px-3 text-xs max-sm:!px-2.5" title="Sair">
             <LogOut className="w-3.5 h-3.5" /> Sair
           </button>

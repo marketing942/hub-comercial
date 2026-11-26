@@ -5,7 +5,7 @@
  * A trilha sobe em ziguezague do pe (0% da meta) ao cume (a maior faixa). Cada
  * faixa de comissao e uma bandeira na trilha; o trecho ja percorrido fica na
  * cor da BU e o avatar do vendedor anda junto com o % da meta. Passou da maior
- * faixa = esta no cume.
+ * faixa = esta no topo.
  *
  * Desenho: o SVG estica (preserveAspectRatio="none") para ocupar o card todo, e
  * bandeiras/avatar sao HTML posicionados em % das mesmas coordenadas — assim os
@@ -176,7 +176,7 @@ export default function CommissionProgress({
               style={{ borderColor: ok ? `${color}66` : "rgba(255,255,255,0.1)", background: "rgba(14,14,20,0.85)" }}
             >
               <div className="text-[12px] font-bold tabular-nums" style={{ color: ok ? color : "#ada99b" }}>
-                {t.meta_pct}%{cume ? " · cume" : ""}
+                {t.meta_pct}%{cume ? " · topo" : ""}
               </div>
               <div className="text-[10px] text-white/50 tabular-nums">+{fmtPctBR(t.commission_pct)}% comissao</div>
             </div>

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize2, Minimize2, Pause, Play, RefreshCw } from "lucide-react";
+import { Pause, Play, RefreshCw } from "lucide-react";
+import BotaoTelaCheia from "./BotaoTelaCheia";
 
 type Slide = { key: string; label: string; node: React.ReactNode };
 
@@ -22,7 +23,6 @@ export default function DashboardCarousel({
   const router = useRouter();
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [full, setFull] = useState(false);
   const [countdown, setCountdown] = useState(intervalSec);
   const cdRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -74,35 +74,13 @@ export default function DashboardCarousel({
     };
   }, [paused, segurando, intervalSec, slides.length, idx]);
 
-  // fullscreen
-  useEffect(() => {
-    // Vale tambem para sair pelo ESC: o modo TV acompanha a tela cheia de verdade.
-    const onFs = () => {
-      const on = !!document.fullscreenElement;
-      setFull(on);
-      document.documentElement.classList.toggle("tv-mode", on);
-    };
-    document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
-  }, []);
-
-  async function toggleFull() {
-    if (!document.fullscreenElement) {
-      await document.documentElement.requestFullscreen?.();
-      document.documentElement.classList.add("tv-mode");
-    } else {
-      await document.exitFullscreen?.();
-      document.documentElement.classList.remove("tv-mode");
-    }
-  }
-
   function jump(i: number) {
     setIdx(i);
     setCountdown(intervalSec);
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Barra de contexto: abas em pilula (douradas, compactas) + periodo e acoes */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
         <div className="inline-flex max-w-full items-center gap-0.5 self-start overflow-x-auto no-scrollbar rounded-xl border border-border bg-panel p-1">
@@ -150,14 +128,7 @@ export default function DashboardCarousel({
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button
-            className="btn-ghost h-9 w-9 !p-0 max-sm:hidden"
-            onClick={toggleFull}
-            title={full ? "Sair de tela cheia" : "Tela cheia (TV)"}
-            aria-label="Tela cheia"
-          >
-            {full ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
+          <BotaoTelaCheia />
         </div>
       </div>
 

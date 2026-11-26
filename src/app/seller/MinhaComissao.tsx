@@ -62,11 +62,11 @@ export default async function MinhaComissao({
   // Coluna da direita do Meu Painel (ao lado do grafico): numeros numa faixa,
   // jornada com a tabela recolhida e o podio compacto, um embaixo do outro.
   return (
-    <section className="flex h-full flex-col gap-3">
+    <section className="flex h-full flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2 px-1 -mb-1.5 -mt-px">
         <div className="eyebrow-label">Minha comissao</div>
         <div className="truncate text-[11px] text-white/40">
-          {rules.cumulative ? "Acumulativa" : "Nao acumulativa"} · a partir de {rules.min_meta_pct}% da meta
+          {rules.after_tax ? `Depois de impostos (${pctBR(rules.tax_pct)}%) · ` : ""}a partir de {rules.min_meta_pct}% da meta
         </div>
       </div>
 
@@ -86,7 +86,11 @@ export default async function MinhaComissao({
             ) : null}
           </Cell>
           <Cell label="Comissao atual" value={calc.tier ? `${pctBR(calc.commissionPct)}%` : "—"} tone={calc.tier ? COLOR.ok : COLOR.mute}>
-            {calc.tier ? "Sobre o seu faturamento" : `Minimo ${rules.min_meta_pct}% da meta`}
+            {calc.tier
+              ? rules.after_tax
+                ? `Sobre ${BRL.format(calc.baseComissao)} (faturamento menos ${pctBR(rules.tax_pct)}% de impostos)`
+                : "Sobre o seu faturamento"
+              : `Minimo ${rules.min_meta_pct}% da meta`}
           </Cell>
           <Cell
             label={calc.nextTier ? `Faltam p/ ${calc.nextTier.meta_pct}%` : "Faixa maxima"}
@@ -101,7 +105,7 @@ export default async function MinhaComissao({
       {/* Jornada + tabela de faixas recolhida */}
       <div className="panel px-4 pt-3 pb-2 flex-1 flex flex-col justify-between">
         <div className="flex items-center justify-between gap-2">
-          <div className="eyebrow-label">Jornada ate o proximo checkpoint</div>
+          <div className="eyebrow-label">Jornada ate o topo</div>
           <div className="text-xs font-semibold tabular-nums" style={{ color }}>{fmtPct(calc.pctMeta)}</div>
         </div>
         <CommissionProgress
@@ -113,13 +117,18 @@ export default async function MinhaComissao({
           avatarInitial={seller.name.trim().charAt(0).toUpperCase() || "?"}
           avatarColor={seller.avatar_color || color}
         />
-        <details className="group border-t border-[var(--hair)] pt-2">
+        {/* A tabela abre POR CIMA do card (absoluta): antes ela empurrava a altura da
+            linha inteira e, ao fechar, o grafico da esquerda nao encolhia de volta, entao
+            a montanha ficava maior do que antes de abrir. */}
+        <details className="group relative border-t border-[var(--hair)] pt-2">
           <summary className="cursor-pointer list-none rounded px-1 outline-none focus-visible:ring-1 focus-visible:ring-accent/60 font-ui text-[11px] font-bold uppercase tracking-[0.12em] text-white/50 hover:text-white">
             <span className="group-open:hidden">Ver tabela de comissao ›</span>
             <span className="hidden group-open:inline">Esconder tabela</span>
           </summary>
-          <TabelaFaixas rules={rules} calc={calc} realizado={realizado} meta={meta} color={color} />
-          {rules.notes && <p className="mt-2 text-xs text-white/50"><b>Regras:</b> {rules.notes}</p>}
+          <div className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-[60vh] overflow-y-auto rounded-md border border-border bg-panel p-3 shadow-glow">
+            <TabelaFaixas rules={rules} calc={calc} realizado={realizado} meta={meta} color={color} />
+            {rules.notes && <p className="mt-2 text-xs text-white/50"><b>Regras:</b> {rules.notes}</p>}
+          </div>
         </details>
       </div>
 
@@ -142,7 +151,7 @@ function TabelaFaixas({
   color: string;
 }) {
   return (
-    <table className="mt-2 w-full text-sm">
+    <table className="w-full text-sm">
       <thead className="text-[11px] uppercase tracking-wider text-white/40">
         <tr className="text-left">
           <th className="py-1.5">% da meta</th>
@@ -159,7 +168,7 @@ function TabelaFaixas({
             <tr key={t.meta_pct} className={`border-t border-[var(--hair)] ${isCurrent ? "bg-accent/5" : ""}`}>
               <td className="py-1.5 font-semibold">{t.meta_pct}%</td>
               <td className="py-1.5 font-semibold" style={{ color: reached ? color : undefined }}>{pctBR(t.commission_pct)}%</td>
-              <td className="py-1.5 text-right text-white/70 max-sm:hidden">{BRL.format((t.commission_pct / 100) * realizado)}</td>
+              <td className="py-1.5 text-right text-white/70 max-sm:hidden">{BRL.format((t.commission_pct / 100) * calc.baseComissao)}</td>
               <td className="py-1.5 text-right">
                 {isCurrent ? (
                   <span className="chip whitespace-nowrap" style={{ background: color + "22", color }}>

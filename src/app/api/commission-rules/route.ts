@@ -12,7 +12,7 @@ export async function GET() {
   return NextResponse.json({ rules });
 }
 
-// POST — apenas admin. Body: { bu, min_meta_pct?, cumulative?, bu_bonus_extra_pct?,
+// POST — apenas admin. Body: { bu, min_meta_pct?, after_tax?, tax_pct?, bu_bonus_extra_pct?,
 //                              top1_bonus?, top2_bonus?, top3_bonus?, notes?, tiers?: [{meta_pct, commission_pct}] }
 export async function POST(req: Request) {
   const s = await getSession();
@@ -25,7 +25,11 @@ export async function POST(req: Request) {
 
   const rulesPayload: Record<string, any> = { bu };
   if (body.min_meta_pct !== undefined) rulesPayload.min_meta_pct = Math.max(0, Number(body.min_meta_pct));
-  if (body.cumulative !== undefined) rulesPayload.cumulative = Boolean(body.cumulative);
+  // "Acumulativa entre faixas" saiu (26/11/2026): grava sempre desligada.
+  rulesPayload.cumulative = false;
+  const impostos: Record<string, unknown> = {};
+  if (body.after_tax !== undefined) impostos.after_tax = Boolean(body.after_tax);
+  if (body.tax_pct !== undefined) impostos.tax_pct = Math.min(100, Math.max(0, Number(body.tax_pct) || 0));
   if (body.bu_bonus_extra_pct !== undefined) rulesPayload.bu_bonus_extra_pct = Math.max(0, Number(body.bu_bonus_extra_pct));
   if (body.top1_bonus !== undefined) rulesPayload.top1_bonus = Math.max(0, Number(body.top1_bonus));
   if (body.top2_bonus !== undefined) rulesPayload.top2_bonus = Math.max(0, Number(body.top2_bonus));
@@ -33,9 +37,15 @@ export async function POST(req: Request) {
   if (body.notes !== undefined) rulesPayload.notes = body.notes ? String(body.notes).slice(0, 500) : null;
   rulesPayload.updated_at = new Date().toISOString();
 
-  const { error: rulesErr } = await supabaseAdmin
+  let { error: rulesErr } = await supabaseAdmin
     .from("commission_rules")
-    .upsert(rulesPayload, { onConflict: "bu" });
+    .upsert({ ...rulesPayload, ...impostos }, { onConflict: "bu" });
+  // Sem as colunas de imposto no banco: grava o resto e avisa.
+  let avisoImpostos: string | null = null;
+  if (rulesErr && Object.keys(impostos).length > 0 && /after_tax|tax_pct/.test(rulesErr.message)) {
+    ({ error: rulesErr } = await supabaseAdmin.from("commission_rules").upsert(rulesPayload, { onConflict: "bu" }));
+    avisoImpostos = "Rode supabase/commission-impostos.sql no Supabase para salvar a opcao de impostos.";
+  }
   if (rulesErr) return NextResponse.json({ error: rulesErr.message }, { status: 500 });
 
   if (Array.isArray(body.tiers)) {
@@ -61,5 +71,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, aviso: avisoImpostos });
 }

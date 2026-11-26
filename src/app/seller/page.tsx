@@ -13,12 +13,9 @@ import {
 } from "@/lib/calc";
 import { BU_COLOR, BU_LABEL, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary, type BU } from "@/lib/products";
-import BULogo from "@/components/BULogo";
-import Cell from "@/components/StatCell";
-import ProgressBar from "@/components/ProgressBar";
+import Indicador, { type Linha } from "@/components/Indicador";
+import BotaoTelaCheia from "@/components/BotaoTelaCheia";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
-import AvatarUploader from "@/components/AvatarUploader";
-import ChangePasswordButton from "@/components/ChangePasswordButton";
 import MinhaComissao from "./MinhaComissao";
 
 export const dynamic = "force-dynamic";
@@ -48,35 +45,25 @@ export default async function MyPanel({
   const isQtd = isQtdPrimary(bu);
   const color = BU_COLOR[bu];
   const fmtMeta = (n: number) => (isQtd ? fmtInt.format(Math.round(n)) : BRL.format(n));
+  // Faixa "Minha meta" no padrao `Indicador`: numero principal = realizado (o unico
+  // com cor), o resto em linhas sem cor. Pace e projecao viraram linhas.
+  const duPassados = businessDaysElapsed(year, month);
+  const duTotal = businessDaysInMonth(year, month);
+  const pace = paceProjection(stats.realizado, stats.metaTotal, duPassados, duTotal);
+  const paceFat = paceProjection(stats.valorRealizado, stats.valorMeta, duPassados, duTotal);
   const pctTone = tonePctMeta(stats.pctSucesso, stats.gap);
-
-  // Faturamento do proprio vendedor (so aparece como card separado nas BUs
-  // cuja meta primaria e quantidade).
   const pctFat = stats.valorMeta > 0 ? (stats.valorRealizado / stats.valorMeta) * 100 : 0;
-  const pctFatTone = tonePctMeta(pctFat, 0);
-
-  // Pace e projecao do vendedor sobre a metrica primaria (dias uteis).
-  const pace = paceProjection(
-    stats.realizado,
-    stats.metaTotal,
-    businessDaysElapsed(year, month),
-    businessDaysInMonth(year, month)
-  );
-  const paceColor = !pace.hasMeta ? COLOR.mute : pace.paceIsAhead ? COLOR.ok : COLOR.danger;
-  const projColor = !pace.hasMeta ? COLOR.mute : pace.pctProjecao >= 100 ? COLOR.ok : COLOR.danger;
-
+  const sinal = (v: number) => (v >= 0 ? "+" : "−");
+  const tomMes = (p: { hasMeta: boolean; paceIsAhead: boolean }, batida: boolean) =>
+    !p.hasMeta ? COLOR.neutral : batida || p.paceIsAhead ? COLOR.ok : COLOR.danger;
+  const linhasRitmo = (p: { hasMeta: boolean; paceDelta: number; projecao: number }, fmt: (n: number) => string): Linha[] =>
+    p.hasMeta ? [["Pace", `${sinal(p.paceDelta)}${fmt(Math.abs(p.paceDelta))}`], ["Projecao", fmt(p.projecao)]] : [];
+  const batida = stats.metaTotal > 0 && stats.realizado >= stats.metaTotal;
+  const hojeBatido = stats.metaDia > 0 && stats.realizadoHoje >= stats.metaDia;
   const ticketTone =
-    stats.ticketMeta > 0
-      ? stats.ticketReal >= stats.ticketMeta
-        ? COLOR.ok
-        : COLOR.danger
-      : COLOR.neutral;
+    stats.ticketMeta > 0 ? (stats.ticketReal >= stats.ticketMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
   const convTone =
-    stats.conversaoMeta > 0
-      ? stats.conversaoReal >= stats.conversaoMeta
-        ? COLOR.ok
-        : COLOR.danger
-      : COLOR.info;
+    stats.conversaoMeta > 0 ? (stats.conversaoReal >= stats.conversaoMeta ? COLOR.ok : COLOR.danger) : COLOR.neutral;
 
   // Mesmas linhas do grafico da BU: valor/qtd do dia, leads, % acumulado e ideal.
   const cumByDay = new Map(series.cumulative.map((c) => [c.day, c]));
@@ -92,36 +79,34 @@ export default async function MyPanel({
     };
   });
 
-  // Indicadores da faixa "Minha meta": 8 em toda BU (+ faturamento nas BUs de
-  // quantidade, + matriculas no Unicive). 4 por linha; 5 quando passa de 8. As
+  // Indicadores da faixa "Minha meta": 4 em toda BU (+ faturamento nas BUs de
+  // quantidade, + matriculas no Unicive). 4 por linha; 3 quando passa de 4. As
   // celulas vazias so completam a ultima linha (a grade fica fechada).
-  const nCells = 8 + (isQtd ? 1 : 0) + (bu === "unicive" ? 1 : 0);
-  const perRow = nCells > 8 ? 5 : 4;
+  const nCells = 4 + (isQtd ? 1 : 0) + (bu === "unicive" ? 1 : 0);
+  const perRow = nCells > 4 ? 3 : 4;
   const fillers = (perRow - (nCells % perRow)) % perRow;
 
-  const monthName = new Date(year, month - 1, 1).toLocaleDateString("pt-BR", { month: "long" });
 
   return (
-    <div className="space-y-4">
-      {/* Cabecalho numa linha (o Meu Painel junta o antigo painel e a Gamificacao) */}
-      <div className="panel px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <AvatarUploader name={seller.name} initialUrl={seller.avatar_url} color={color} />
-        <div className="min-w-0">
-          <div className="font-display text-lg font-bold leading-tight truncate">Ola, {seller.name.split(" ")[0]}</div>
-          <div className="flex items-center gap-1.5 font-ui text-[11px] font-bold uppercase tracking-[0.14em] text-white/45">
-            <BULogo bu={bu} size={14} />
-            {BU_LABEL[bu]} · {monthName}
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+    <div className="space-y-2">
+      {/* Esquerda: minha meta (indicadores em 2 linhas) + evolucao diaria.
+          Direita: minha comissao, do topo ate embaixo (o que o vendedor mais olha). */}
+      <div className="meu-painel-grade grid grid-cols-1 xl:grid-cols-12 gap-2 items-stretch">
+      <div className="xl:col-span-6 min-w-0 flex flex-col gap-2">
+      <section>
+        {/* Sem cabecalho (26/11/2026): foto e senha estao na barra do topo. O seletor
+            de BU so aparece para quem vende em mais de uma. */}
+        <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+          <div className="eyebrow-label">Minha meta</div>
+          <div className="flex items-center gap-2">
           {bus.length > 1 && (
-            <div className="inline-flex p-1 rounded-xl bg-panel2 border border-border">
+            <div className="inline-flex p-0.5 rounded-xl bg-panel2 border border-border">
               {bus.map((b) => (
                 <Link
                   key={b}
                   href={`/seller?bu=${b}`}
                   scroll={false}
-                  className={`px-3 py-1 rounded-lg font-ui text-[11px] font-bold uppercase tracking-[0.1em] transition ${
+                  className={`px-2.5 py-0.5 rounded-lg font-ui text-[11px] font-bold uppercase tracking-[0.1em] transition ${
                     b === bu ? "bg-accent text-black" : "text-white/60 hover:text-white"
                   }`}
                 >
@@ -130,102 +115,70 @@ export default async function MyPanel({
               ))}
             </div>
           )}
-          <ChangePasswordButton sellerName={seller.name} hasPassword={Boolean(seller.has_password)} />
+            <BotaoTelaCheia />
+          </div>
         </div>
-      </div>
-
-      {/* Esquerda: minha meta (indicadores em 2 linhas) + evolucao diaria.
-          Direita: minha comissao, do topo ate embaixo (o que o vendedor mais olha). */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
-      <div className="xl:col-span-6 min-w-0 flex flex-col gap-4">
-      <section>
-        <div className="mb-1.5 px-1 eyebrow-label">Minha meta</div>
         <div className="panel overflow-hidden">
-          <div className={`-ml-px -mt-px grid grid-cols-2 ${nCells > 8 ? "md:grid-cols-5" : "md:grid-cols-4"} [&_.cell]:!p-3 [&_.cell_.font-display]:!text-[clamp(1.05rem,1.15vw,1.45rem)]`}>
-            {/* Meta principal + barra de progresso (substitui "Quanto falta pra minha meta") */}
-            <div>
-              <Cell
-                label={isQtd ? "Matriculas (real / meta)" : "Total vendido (real / meta)"}
-                value={fmtMeta(stats.realizado)}
-                tone={COLOR.neutral}
-              >
-                <div className="mt-1">
-                  <ProgressBar value={stats.pctSucesso} color={pctTone} height={6} />
-                </div>
-                <div className="mt-1.5">
-                  Meta <b className="text-white/70">{fmtMeta(stats.metaTotal)}</b>
-                  <span className="mx-1.5 text-white/25">·</span>
-                  <b style={{ color: pctTone }}>{fmtPct(stats.pctSucesso)}</b>
-                </div>
-                <div className="mt-0.5">
-                  {stats.pctSucesso >= 100 ? (
-                    <b style={{ color: COLOR.ok }}>Meta atingida</b>
-                  ) : (
-                    <>Faltam <b style={{ color: pctTone }}>{fmtMeta(stats.falta)}</b></>
-                  )}
-                </div>
-              </Cell>
-            </div>
-
+          <div className={`-ml-px -mt-px grid grid-cols-2 ${perRow === 3 ? "md:grid-cols-3" : "md:grid-cols-4"} [&_.cell]:!p-3 [&_.cell_.font-display]:!text-[clamp(1.05rem,1.15vw,1.45rem)]`}>
+            <Indicador
+              label={isQtd ? "Matriculas" : "Total vendido"}
+              value={fmtMeta(stats.realizado)}
+              tone={tomMes(pace, batida)}
+              linhas={[
+                ["Meta", stats.metaTotal > 0 ? `${fmtMeta(stats.metaTotal)} · ${fmtPct(stats.pctSucesso)}` : "Sem meta"],
+                ...(stats.metaTotal > 0 ? ([["Falta", batida ? "Batida" : fmtMeta(stats.falta)]] as Linha[]) : []),
+                ...linhasRitmo(pace, fmtMeta),
+              ]}
+            />
             {isQtd && (
-              <div>
-                <Cell label="Faturamento (real / meta)" value={BRL.format(stats.valorRealizado)} tone={COLOR.neutral}>
-                  <div className="mt-1">
-                    <ProgressBar value={pctFat} color={pctFatTone} height={6} />
-                  </div>
-                  <div className="mt-1.5">
-                    {stats.valorMeta > 0 ? (
-                      <>
-                        Meta <b className="text-white/70">{BRL.format(stats.valorMeta)}</b>
-                        <span className="mx-1.5 text-white/25">·</span>
-                        <b style={{ color: pctFatTone }}>{fmtPct(pctFat)}</b>
-                      </>
-                    ) : (
-                      "Sem meta"
-                    )}
-                  </div>
-                </Cell>
-              </div>
+              <Indicador
+                label="Faturamento"
+                value={BRL.format(stats.valorRealizado)}
+                tone={tomMes(paceFat, stats.valorMeta > 0 && stats.valorRealizado >= stats.valorMeta)}
+                linhas={[
+                  ["Meta", stats.valorMeta > 0 ? `${BRL.format(stats.valorMeta)} · ${fmtPct(pctFat)}` : "Sem meta"],
+                  ...linhasRitmo(paceFat, (n) => BRL.format(n)),
+                ]}
+              />
             )}
-
-            <Cell
-              label={isQtd ? "Meta do dia (matriculas)" : "Meta do dia"}
-              value={fmtMeta(stats.metaDia)}
-              tone={COLOR.warning}
-            >
-              {stats.gap > 0 ? (
-                <>Atrasado em <b style={{ color: COLOR.danger }}>{fmtMeta(stats.gap)}</b></>
-              ) : (
-                <b style={{ color: COLOR.ok }}>No ritmo</b>
-              )}
-            </Cell>
-            <Cell label="Realizado hoje" value={fmtMeta(stats.realizadoHoje)} tone={stats.realizadoHoje > 0 ? COLOR.ok : COLOR.neutral}>
-              {stats.vendasCount} venda{stats.vendasCount === 1 ? "" : "s"} no mes
-            </Cell>
-
-            <Cell label="Pace" value={pace.hasMeta ? `${pace.paceIsAhead ? "+" : "-"}${fmtMeta(Math.abs(pace.paceDelta))}` : "—"} tone={paceColor}>
-              {pace.hasMeta ? (pace.paceIsAhead ? "Acima do ritmo ideal" : "Abaixo do ritmo ideal") : "Sem meta"}
-            </Cell>
-            <Cell label="Projecao" value={fmtMeta(pace.projecao)} tone={projColor}>
-              {pace.hasMeta ? <>{fmtPct(pace.pctProjecao)} da meta no ritmo atual</> : "Sem meta"}
-            </Cell>
-
-            <Cell label="Ticket medio" value={BRL.format(stats.ticketReal)} tone={ticketTone}>
-              {stats.ticketMeta > 0 ? <>Meta {BRL.format(stats.ticketMeta)}</> : "Sem meta"}
-            </Cell>
-            <Cell label="Conversao" value={fmtPct(stats.conversaoReal)} tone={convTone}>
-              {stats.conversaoMeta > 0 ? <>Meta {fmtPct(stats.conversaoMeta)}</> : `${stats.vendasCount} vendas`}
-            </Cell>
-
-            <Cell label="Leads recebidos" value={fmtInt.format(stats.leads)} tone={COLOR.neutral}>
-              No mes
-            </Cell>
+            <Indicador
+              label={isQtd ? "Hoje (matriculas)" : "Vendido hoje"}
+              value={fmtMeta(stats.realizadoHoje)}
+              tone={hojeBatido ? COLOR.ok : COLOR.neutral}
+              linhas={
+                stats.metaDia > 0
+                  ? [
+                      ["Meta do dia", fmtMeta(stats.metaDia)],
+                      ["Falta", hojeBatido ? "Batida" : fmtMeta(Math.max(0, stats.metaDia - stats.realizadoHoje))],
+                    ]
+                  : [["Meta do dia", "Sem meta"]]
+              }
+            />
+            <Indicador
+              label="Ticket medio"
+              value={BRL.format(stats.ticketReal)}
+              tone={ticketTone}
+              linhas={[
+                ["Meta", stats.ticketMeta > 0 ? BRL.format(stats.ticketMeta) : "Sem meta"],
+                ["Vendas no mes", fmtInt.format(stats.vendasCount)],
+              ]}
+            />
+            <Indicador
+              label="Conversao"
+              value={fmtPct(stats.conversaoReal)}
+              tone={convTone}
+              linhas={[
+                ["Meta", stats.conversaoMeta > 0 ? fmtPct(stats.conversaoMeta) : "Sem meta"],
+                ["Vendas / leads", `${fmtInt.format(stats.vendasCount)} / ${fmtInt.format(stats.leads)}`],
+              ]}
+            />
             {bu === "unicive" ? (
-              <Cell label="Matriculas" value={fmtInt.format(stats.qtdRealizada)} tone={stats.qtdMeta > 0 && stats.qtdRealizada >= stats.qtdMeta ? COLOR.ok : COLOR.neutral}>
-                {stats.qtdMeta > 0
-                  ? `Meta ${fmtInt.format(stats.qtdMeta)} (${fmtPct((stats.qtdRealizada / stats.qtdMeta) * 100)})`
-                  : "Sem meta de matriculas"}
-              </Cell>
+              <Indicador
+                label="Matriculas"
+                value={fmtInt.format(stats.qtdRealizada)}
+                tone={stats.qtdMeta > 0 && stats.qtdRealizada >= stats.qtdMeta ? COLOR.ok : COLOR.neutral}
+                linhas={[["Meta", stats.qtdMeta > 0 ? `${fmtInt.format(stats.qtdMeta)} · ${fmtPct((stats.qtdRealizada / stats.qtdMeta) * 100)}` : "Sem meta"]]}
+              />
             ) : null}
             {Array.from({ length: fillers }, (_, i) => <div key={`f${i}`} className="cell max-md:hidden" aria-hidden />)}
           </div>
@@ -244,7 +197,6 @@ export default async function MyPanel({
               height="fill"
               series={[
                 { key: isQtd ? "qtd" : "valor", label: isQtd ? "Matriculas (dia)" : "Minhas vendas (dia)", color, axis: "left", unit: isQtd ? "int" : "currency", strokeWidth: 2.5 },
-                { key: "leads", label: "Leads (dia)", color: COLOR.info, axis: "left", unit: "int", strokeWidth: 2 },
                 { key: "pct", label: "% Minha meta acumulada", color: pctTone, axis: "right", unit: "percent", strokeWidth: 3 },
                 { key: "idealPct", label: "% Ideal", color: COLOR.warning, axis: "right", unit: "percent", dashed: true, strokeWidth: 1.5 },
               ]}

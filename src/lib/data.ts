@@ -1389,12 +1389,9 @@ export type DashboardSnapshot = {
   sellers: SellerStats[];
   taxaConversao: number;
   leadsTotal: number;
-  breakdown: ProductBreakdownRow[];
-  ligacao: LigacaoRow[];
-  indicacao: IndicacaoRow[];
   longTerm: import("./longTerm").LongTermProgress | null;
-  /** Receita por categoria do Conta Azul (com meta por linha), quando ha dado. */
-  categoriasCA: import("./ca/metasLinhaTipos").CategoriaCA[];
+  // A receita por categoria/linha saiu dos paineis das BUs em 25/11/2026: fica
+  // so no GAV. Por isso o snapshot nao le mais categorias, ligacao nem indicacao.
 };
 
 export async function dashboardSnapshot(
@@ -1405,18 +1402,12 @@ export async function dashboardSnapshot(
   allStats?: SellerStats[]
 ): Promise<DashboardSnapshot> {
   const { loadLongTermGoal, computeLongTermProgress } = await import("./longTerm");
-  const { categoriasParaDashboard } = await import("./ca/metasLinha");
-  const periodo = { ...periodNow(), ...opts };
-  const [series, all, breakdown, ligacao, indicacao, ltGoal, categoriasCA] = await Promise.all([
+  const [series, all, ltGoal] = await Promise.all([
     buSeries(bu, opts),
     allStats ?? statsForAll(opts),
-    productBreakdown(bu, opts),
-    ligacaoBreakdown({ bu, ...opts }),
-    indicacaoBreakdown({ bu, ...opts }),
     // A meta longa NAO tem origem: ela conta matriculas da base, nao vendas do
     // mes. Fica igual nas duas visoes, de proposito.
     loadLongTermGoal(bu),
-    categoriasParaDashboard(bu, periodo.year, periodo.month),
   ]);
   const longTerm = ltGoal ? await computeLongTermProgress(ltGoal) : null;
   const sellers = all.filter((s) => s.bu === bu);
@@ -1429,7 +1420,7 @@ export async function dashboardSnapshot(
   const leadsTotal = Array.from(leadsBySeller.values()).reduce((a, b) => a + b, 0);
   const vendas = sellers.reduce((a, b) => a + b.vendasCount, 0);
   const taxaConversao = leadsTotal > 0 ? (vendas / leadsTotal) * 100 : 0;
-  return { bu, series, sellers, leadsTotal, taxaConversao, breakdown, ligacao, indicacao, longTerm, categoriasCA };
+  return { bu, series, sellers, leadsTotal, taxaConversao, longTerm };
 }
 
 export { daysInMonth, daysRemainingIncludingToday, todayDayOfMonth, periodNow };

@@ -12,7 +12,12 @@ export type CommissionTier = {
 export type CommissionRules = {
   bu: BU;
   min_meta_pct: number;         // comissao so a partir desse % da meta ind.
-  cumulative: boolean;          // se true, soma tiers atingidos; se false, pega o maior
+  /** Legado: a opcao "acumulativa" saiu em 26/11/2026; o calculo usa SEMPRE a maior faixa atingida. */
+  cumulative: boolean;
+  /** Comissao depois de impostos (26/11/2026): a % incide sobre o faturamento MENOS `tax_pct`. Padrao: desligada. */
+  after_tax: boolean;
+  /** % media de impostos da empresa, usada quando `after_tax` esta ligada. */
+  tax_pct: number;
   bu_bonus_extra_pct: number;   // % acima da meta coletiva pra destravar podio
   top1_bonus: number;
   top2_bonus: number;
@@ -41,6 +46,8 @@ export function defaultRulesFor(bu: BU): CommissionRules {
     bu,
     min_meta_pct: 80,
     cumulative: false,
+    after_tax: false,
+    tax_pct: 0,
     bu_bonus_extra_pct: 10,
     top1_bonus: 300,
     top2_bonus: 200,
@@ -51,10 +58,16 @@ export function defaultRulesFor(bu: BU): CommissionRules {
 }
 
 export async function loadCommissionRules(): Promise<Record<BU, CommissionRules>> {
+  const BASE = "bu, min_meta_pct, cumulative, bu_bonus_extra_pct, top1_bonus, top2_bonus, top3_bonus, notes";
+  const lerRegras = async () => {
+    // Colunas de imposto (supabase/commission-impostos.sql) podem ainda nao existir:
+    // sem elas, cai no select antigo e a opcao fica desligada.
+    const r = await supabaseAdmin.from("commission_rules").select(`${BASE}, after_tax, tax_pct`);
+    if (!r.error) return r;
+    return supabaseAdmin.from("commission_rules").select(BASE);
+  };
   const [{ data: rulesRows }, { data: tierRows }] = await Promise.all([
-    supabaseAdmin
-      .from("commission_rules")
-      .select("bu, min_meta_pct, cumulative, bu_bonus_extra_pct, top1_bonus, top2_bonus, top3_bonus, notes"),
+    lerRegras(),
     supabaseAdmin
       .from("commission_tiers")
       .select("bu, meta_pct, commission_pct")
@@ -73,7 +86,9 @@ export async function loadCommissionRules(): Promise<Record<BU, CommissionRules>
       map[bu] = {
         bu,
         min_meta_pct: Number(r.min_meta_pct ?? 80),
-        cumulative: Boolean(r.cumulative),
+        cumulative: false,
+        after_tax: Boolean((r as any).after_tax),
+        tax_pct: Math.min(100, Math.max(0, Number((r as any).tax_pct ?? 0))),
         bu_bonus_extra_pct: Number(r.bu_bonus_extra_pct ?? 10),
         top1_bonus: Number(r.top1_bonus ?? 300),
         top2_bonus: Number(r.top2_bonus ?? 200),
@@ -96,8 +111,10 @@ export type CommissionCalc = {
   realizado: number;          // R$
   pctMeta: number;            // 0..∞
   tier: CommissionTier | null;// tier atingido (o mais alto)
-  commissionPct: number;      // % efetivo (soma se cumulative, ultimo se nao)
+  commissionPct: number;      // % da faixa atingida (a maior; nunca soma faixas)
   commissionValue: number;    // R$
+  /** Sobre o que a % incide: o realizado, ou o realizado menos impostos (`after_tax`). */
+  baseComissao: number;
   nextTier: CommissionTier | null;   // proximo tier acima do atual
   toNextTier: number;         // R$ pra chegar no proximo tier
 };
@@ -108,7 +125,11 @@ export function calcCommission(
   rules: CommissionRules
 ): CommissionCalc {
   const sorted = [...rules.tiers].sort((a, b) => a.meta_pct - b.meta_pct);
+  // A faixa e decidida pelo % da meta (realizado bruto); a % de comissao incide
+  // sobre a base — bruta, ou liquida de impostos quando a opcao esta ligada.
+  const baseComissao = rules.after_tax ? realizado * (1 - Math.min(100, Math.max(0, rules.tax_pct)) / 100) : realizado;
   const empty: CommissionCalc = {
+    baseComissao,
     meta,
     realizado,
     pctMeta: 0,
@@ -127,8 +148,7 @@ export function calcCommission(
   for (const t of sorted) {
     if (pct >= t.meta_pct) {
       matched = t;
-      if (rules.cumulative) effectivePct += t.commission_pct;
-      else effectivePct = t.commission_pct;
+      effectivePct = t.commission_pct;
     }
   }
 
@@ -136,6 +156,7 @@ export function calcCommission(
     // proximo tier = primeiro acima do min_meta_pct que ainda nao atingiu
     const next = sorted.find((t) => t.meta_pct > pct) || null;
     return {
+      baseComissao,
       meta,
       realizado,
       pctMeta: pct,
@@ -147,10 +168,11 @@ export function calcCommission(
     };
   }
 
-  const commissionValue = (effectivePct / 100) * realizado;
+  const commissionValue = (effectivePct / 100) * baseComissao;
   const nextTier = sorted.find((t) => t.meta_pct > matched!.meta_pct) || null;
   const toNextTier = nextTier ? Math.max(0, (nextTier.meta_pct / 100) * meta - realizado) : 0;
   return {
+    baseComissao,
     meta,
     realizado,
     pctMeta: pct,

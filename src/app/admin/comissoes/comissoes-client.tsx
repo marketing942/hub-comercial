@@ -74,7 +74,8 @@ export default function ComissoesClient({
 function RulesEditor({ bu, initial }: { bu: BU; initial: CommissionRules }) {
   const router = useRouter();
   const [minPct, setMinPct] = useState(initial.min_meta_pct);
-  const [cumulative, setCumulative] = useState(initial.cumulative);
+  const [afterTax, setAfterTax] = useState(initial.after_tax);
+  const [taxPct, setTaxPct] = useState(initial.tax_pct);
   const [extra, setExtra] = useState(initial.bu_bonus_extra_pct);
   const [top1, setTop1] = useState(initial.top1_bonus);
   const [top2, setTop2] = useState(initial.top2_bonus);
@@ -110,7 +111,8 @@ function RulesEditor({ bu, initial }: { bu: BU; initial: CommissionRules }) {
       body: JSON.stringify({
         bu,
         min_meta_pct: minPct,
-        cumulative,
+        after_tax: afterTax,
+        tax_pct: taxPct,
         bu_bonus_extra_pct: extra,
         top1_bonus: top1,
         top2_bonus: top2,
@@ -121,7 +123,8 @@ function RulesEditor({ bu, initial }: { bu: BU; initial: CommissionRules }) {
     });
     setSaving(false);
     if (r.ok) {
-      setMsg({ kind: "ok", text: "Regras salvas. Painel dos vendedores ja reflete." });
+      const j = await r.json().catch(() => ({}));
+      setMsg(j.aviso ? { kind: "err", text: j.aviso } : { kind: "ok", text: "Regras salvas. Painel dos vendedores ja reflete." });
       router.refresh();
     } else {
       const j = await r.json().catch(() => ({}));
@@ -141,16 +144,25 @@ function RulesEditor({ bu, initial }: { bu: BU; initial: CommissionRules }) {
           <label className="label">Comissao a partir de (%)</label>
           <NumberField className="input" step="0.5" value={minPct} onChange={setMinPct} />
         </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 select-none cursor-pointer mt-6">
-            <input
-              type="checkbox"
-              checked={cumulative}
-              onChange={(e) => setCumulative(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">Comissao acumulativa entre tiers</span>
-          </label>
+      </div>
+
+      {/* Comissao depois de impostos (26/11/2026). Vem DESLIGADA; ligada, a % da faixa
+          incide sobre o faturamento do vendedor menos a % media de impostos. */}
+      <div className="rounded-md border border-border bg-panel2/50 p-3">
+        <label className="flex cursor-pointer select-none items-center gap-2">
+          <input type="checkbox" checked={afterTax} onChange={(e) => setAfterTax(e.target.checked)} className="h-4 w-4" />
+          <span className="text-sm font-semibold">Comissao depois de impostos</span>
+        </label>
+        <p className="mt-1 text-xs text-white/50">
+          Ligada, o vendedor recebe a % da faixa sobre o que vendeu <b>menos</b> a % media de impostos da empresa.
+          A faixa continua sendo decidida pelo % da meta.
+        </p>
+        <div className={`mt-2 flex items-center gap-2 ${afterTax ? "" : "pointer-events-none opacity-40"}`}>
+          <label className="label !mb-0">Impostos medios (%)</label>
+          <NumberField className="input !w-28" step="0.1" min={0} value={taxPct} onChange={(v) => setTaxPct(Math.min(100, Math.max(0, v)))} />
+          {afterTax && taxPct > 0 && (
+            <span className="text-xs text-white/50">Ex.: venda de R$ 10.000 vira base de R$ {(10000 * (1 - taxPct / 100)).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</span>
+          )}
         </div>
       </div>
 

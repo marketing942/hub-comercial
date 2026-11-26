@@ -64,15 +64,13 @@ const BU_NOME: Record<string, string> = { cppem: "CPPEM", unicive: "UNICIVE", co
 export default function MapaClient({
   categorias,
   itens,
-  vendedores,
-  sellers,
 }: {
   categorias: LinhaMapa[];
   itens: LinhaMapa[];
-  vendedores: VendedorMapa[];
-  sellers: { id: string; name: string; bu: string }[];
 }) {
-  const [aba, setAba] = useState<"categorias" | "itens" | "vendedores">("categorias");
+  // A aba "Vendedores" foi para Configuracoes -> Vendedores (26/11/2026): a ligacao
+  // cadastro do Conta Azul -> vendedor do Hub fica junto do cadastro do vendedor.
+  const [aba, setAba] = useState<"categorias" | "itens">("categorias");
   // Categoria classificada = tem BU (ou foi ignorada). A linha de receita E a propria categoria.
   const pendentesCat = categorias.filter((c) => !c.bu && !c.ignorar).length;
   /**
@@ -82,12 +80,10 @@ export default function MapaClient({
    * ser tarefa e vira ruído.
    */
   const pendentesItem = itens.filter((c) => c.relevante && !c.product_line && !c.ignorar).length;
-  const pendentesVend = vendedores.filter((v) => v.destino === "pendente").length;
 
   const abas = [
     { id: "categorias" as const, label: "Categorias", n: pendentesCat, total: categorias.length },
     { id: "itens" as const, label: "Itens (avançado)", n: pendentesItem, total: itens.filter((i) => i.relevante).length },
-    { id: "vendedores" as const, label: "Vendedores", n: pendentesVend, total: vendedores.length },
   ];
 
   return (
@@ -98,11 +94,11 @@ export default function MapaClient({
           A <strong>linha de receita é a categoria do Conta Azul</strong> — não há mais o que ligar a
           uma linha do Hub. Em <strong>Categorias</strong> você só diz a <strong>BU</strong> e se a
           categoria <strong>conta para o vendedor</strong> (matrícula conta; mensalidade, repasse,
-          fardamento e livros vão para a diretoria/grupo). Em <strong>Vendedores</strong> você diz se
-          o cadastro do Conta Azul é vendedor, canal direto ou grupo. <strong>Itens</strong> é
-          avançado: só serve ao dashboard antigo por linha.
+          fardamento e livros vão para o pós-venda). <strong>Itens</strong> é avançado: só serve ao
+          dashboard antigo por linha. A ligação dos vendedores do Conta Azul fica em
+          <strong> Configurações → Vendedores</strong>.
         </p>
-        <AplicarTudo pendentes={pendentesCat + pendentesItem + pendentesVend} />
+        <AplicarTudo pendentes={pendentesCat + pendentesItem} />
 
         <div className="inline-flex rounded-xl border border-border bg-panel p-1">
           {abas.map((a) => (
@@ -123,9 +119,7 @@ export default function MapaClient({
         </div>
       </section>
 
-      {aba === "vendedores" ? (
-        <TabelaVendedores vendedores={vendedores} sellers={sellers} />
-      ) : aba === "categorias" ? (
+      {aba === "categorias" ? (
         <TabelaLinhas linhas={categorias} tipo="categoria" />
       ) : (
         <TabelaItens itens={itens} />
@@ -424,7 +418,7 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
   );
 }
 
-function TabelaVendedores({ vendedores, sellers }: { vendedores: VendedorMapa[]; sellers: { id: string; name: string; bu: string }[] }) {
+export function TabelaVendedores({ vendedores, sellers }: { vendedores: VendedorMapa[]; sellers: { id: string; name: string; bu: string }[] }) {
   return (
     <section className="panel overflow-hidden p-4">
       <p className="mb-3 max-w-3xl text-xs leading-relaxed text-white/50">

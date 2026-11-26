@@ -22,8 +22,12 @@ export default async function GoalsPage() {
           Escolha a BU e o mês. Três níveis, nesta ordem: meta total da BU, meta por linha de receita e meta por vendedor. Um botão salva tudo.
         </p>
       </div>
-      <GoalsClient sellers={sellers} defaultYear={year} defaultMonth={month} />
-      <LongTermGoalsEditor initial={longTermGoals} />
+      <GoalsClient
+        sellers={sellers}
+        defaultYear={year}
+        defaultMonth={month}
+        metaLongaColegio={<LongTermGoalsEditor initial={longTermGoals} />}
+      />
     </div>
   );
 }

@@ -13,7 +13,7 @@ export const ORIGENS: Origem[] = ["vendedores", "direto", "diretoria"];
 export const ORIGEM_ROTULO: Record<Origem, string> = {
   vendedores: "Vendedores",
   direto: "Direto",
-  diretoria: "Diretoria / Grupo",
+  diretoria: "Pós-venda",
 };
 
 /** Cor de cada origem (identidade da serie no grafico, nao resultado). */
@@ -37,7 +37,9 @@ export const BU_GESTAO_ROTULO: Record<BuKey, string> = {
 /** Cores por BU no grafico: so identidade (ver CLAUDE.md §2). */
 export const COR_BU: Record<BuKey, string> = {
   cppem: "#c9ae7a",
-  unicive: "#F5C518",
+  // 26/11/2026: UNICIVE verde no GAV (era o amarelo da marca, confundia com o
+  // dourado do CPPEM nas bolinhas). So identidade, nunca resultado.
+  unicive: "#3fbf8a",
   colegio_cppem: "#5B8FE0",
   grupo: COLOR.mute,
 };

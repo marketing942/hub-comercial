@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Copy, RotateCw, Save, SplitSquareHorizontal, Wand2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RotateCw, Save, SplitSquareHorizontal, Wand2 } from "lucide-react";
 
 import NumberField from "@/components/NumberField";
 import { BU_COLOR, BU_LABEL, COLOR } from "@/lib/brand";
@@ -31,7 +31,18 @@ const vazioMeta = (id: string): SellerGoal => ({ seller_id: id, valor_meta: 0, q
  *  3. Meta por VENDEDOR
  * Um botao Salvar grava os tres.
  */
-export default function GoalsClient({ sellers, defaultYear, defaultMonth }: { sellers: Seller[]; defaultYear: number; defaultMonth: number }) {
+export default function GoalsClient({
+  sellers,
+  defaultYear,
+  defaultMonth,
+  metaLongaColegio,
+}: {
+  sellers: Seller[];
+  defaultYear: number;
+  defaultMonth: number;
+  /** Editor da meta de longo prazo: so aparece com o Colegio selecionado (26/11/2026). */
+  metaLongaColegio?: React.ReactNode;
+}) {
   const [bu, setBu] = useState<BU>("cppem");
   const [year, setYear] = useState(defaultYear);
   const [month, setMonth] = useState(defaultMonth);
@@ -163,22 +174,6 @@ export default function GoalsClient({ sellers, defaultYear, defaultMonth }: { se
     setDirty(true);
   }
 
-  async function copiarMesAnterior() {
-    const pm = month === 1 ? 12 : month - 1;
-    const py = month === 1 ? year - 1 : year;
-    setLoading(true);
-    try {
-      const { rl, rp } = await carregar({ year: py, month: pm });
-      aplicar(rl, rp);
-      setDirty(true);
-      setFeedback({ kind: "ok", msg: "Metas copiadas do mes anterior. Revise e salve." });
-    } catch {
-      setFeedback({ kind: "err", msg: "Nao foi possivel copiar." });
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function salvar() {
     setSaving(true);
     setFeedback(null);
@@ -240,9 +235,6 @@ export default function GoalsClient({ sellers, defaultYear, defaultMonth }: { se
           ))}
         </select>
         <NumberField className="input !w-24 !py-1.5 text-sm" value={year} onChange={setYear} />
-        <button className="btn-ghost !py-1.5 text-xs" onClick={() => void copiarMesAnterior()} disabled={loading} title="Copia as metas do mes anterior">
-          <Copy className="h-3.5 w-3.5" /> Copiar mes anterior
-        </button>
         <div className="flex-1" />
         {dirty && !feedback && <span className="text-xs" style={{ color: COLOR.warning }}>Alterações não salvas</span>}
         {feedback && <span className="text-xs" style={{ color: feedback.kind === "ok" ? COLOR.ok : COLOR.danger }}>{feedback.msg}</span>}
@@ -387,6 +379,7 @@ export default function GoalsClient({ sellers, defaultYear, defaultMonth }: { se
           </div>
         )}
       </section>
+      {bu === "colegio_cppem" && metaLongaColegio}
     </div>
   );
 }
