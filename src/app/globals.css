@@ -139,6 +139,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .tv-mode .gav .cell { padding: 0.45rem 0.75rem !important; }
   .tv-mode .gav .gav-grafico { min-height: 0; height: 150px !important; }
   .tv-mode .gav .linhas-receita { row-gap: 0.85rem; }
+  .tv-mode .gav .gav-porbu .barra-dupla { height: 14px; }
+  .tv-mode .gav .gav-porbu .barra-dupla > span { font-size: 11px !important; }
 }
 
 @media (max-height: 800px) {

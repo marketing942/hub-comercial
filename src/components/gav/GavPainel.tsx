@@ -55,6 +55,32 @@ function nomeCurto(nome: string): string {
   return s || nome;
 }
 
+/**
+ * Ordem fixa das linhas de receita no GAV (da esquerda para a direita, 4 por linha).
+ * Casa pelo nome curto da categoria do Conta Azul, sem acento, e pela BU.
+ * "Eventos" e "Multas" valem para qualquer BU.
+ */
+const ORDEM_LINHAS: { bu?: string; casa: (n: string) => boolean }[] = [
+  { bu: "cppem", casa: (n) => n.startsWith("MENTORIAS") },
+  { bu: "cppem", casa: (n) => n.startsWith("TURMAS PRESENCIAIS") },
+  { bu: "cppem", casa: (n) => n.startsWith("CURSOS ONLINE") },
+  { bu: "cppem", casa: (n) => n.startsWith("MATERIAIS DIGITAIS") },
+  { bu: "cppem", casa: (n) => n.startsWith("MATERIAIS FISICOS") },
+  { bu: "cppem", casa: (n) => n.startsWith("SUPLETIVO") },
+  { bu: "unicive", casa: (n) => n.startsWith("MATRICULA") },
+  { casa: (n) => n.includes("REPASSE") },
+  { bu: "colegio_cppem", casa: (n) => n.startsWith("MATRICULA") },
+  { bu: "colegio_cppem", casa: (n) => n.startsWith("MENSALIDADE") },
+  { bu: "colegio_cppem", casa: (n) => n.startsWith("FARDAMENTO") },
+  { casa: (n) => n.startsWith("EVENTOS") },
+  { casa: (n) => n.startsWith("MULTA") },
+];
+function posicaoDaLinha(rotulo: string, bu: string): number {
+  const n = nomeCurto(rotulo).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const i = ORDEM_LINHAS.findIndex((o) => (!o.bu || o.bu === bu) && o.casa(n));
+  return i >= 0 ? i : ORDEM_LINHAS.length;
+}
+
 /** Uma linha "nome · fatia ......... R$ real / R$ meta  %" com a barra de bala embaixo. */
 function LinhaBala({
   rotulo,
@@ -143,17 +169,6 @@ export default function GavPainel({
   const falta = Math.max(0, meta - real);
   const corEmpresa = tom(pct, idealPct, temMeta);
 
-  // Selo de situacao da empresa.
-  const selo = !temMeta
-    ? { txt: "Sem meta", cor: COLOR.mute }
-    : pct >= 100
-      ? { txt: "Meta batida", cor: COLOR.ok }
-      : !corrente
-        ? { txt: "Meta nao batida", cor: COLOR.danger }
-        : ritmo.paceIsAhead
-          ? { txt: "Acima do ritmo", cor: COLOR.ok }
-          : { txt: "Abaixo do ritmo", cor: corEmpresa };
-
   // Pontos do grafico: ritmo ideal acumulado por dia util.
   let du = 0;
   const pontos: PontoGav[] = dados.dias.map((d) => {
@@ -167,11 +182,13 @@ export default function GavPainel({
   });
 
   const bus = BUS_GESTAO.filter((b) => dados.porBu[b] > 0 || dados.metaPorBu[b] > 0);
-  // Todas as linhas de receita num card so: BU por BU (na ordem das BUs) e, dentro
-  // da BU, meta maior primeiro, depois receita.
-  const linhas = bus.flatMap((b) =>
-    dados.categorias.filter((c) => c.bu === b).sort((x, y) => y.metaValor - x.metaValor || y.valor - x.valor)
-  );
+  // Todas as linhas de receita num card so, na ORDEM FIXA pedida pelo time (26/11/2026;
+  // ver ORDEM_LINHAS). Linha que nao bate com nenhuma regra vai para o fim, BU por BU.
+  const linhas = bus
+    .flatMap((b) => dados.categorias.filter((c) => c.bu === b))
+    .map((c, k) => ({ c, k, r: posicaoDaLinha(c.rotulo, c.bu) }))
+    .sort((x, y) => x.r - y.r || x.k - y.k)
+    .map((x) => x.c);
 
   return (
     <div className="gav space-y-2">
@@ -185,15 +202,7 @@ export default function GavPainel({
             cada origem na receita total fica na dica (i). Numeros seguem a largura do
             card (cqi): nunca quebram de linha. */}
         <section className="gav-hero panel flex flex-col px-5 py-4 xl:col-span-7">
-          <div className="flex items-center gap-3">
-            <div className="eyebrow-label">Receita CPPEM Educação</div>
-            <span
-              className="shrink-0 rounded-full border px-2.5 py-0.5 font-ui text-[11px] font-bold uppercase tracking-[0.12em]"
-              style={{ color: selo.cor, borderColor: `${selo.cor}55`, background: `${selo.cor}14` }}
-            >
-              {selo.txt}
-            </span>
-          </div>
+          <div className="eyebrow-label">Receita CPPEM Educação</div>
           <div className="mt-3 grid grid-cols-[max-content_max-content_max-content_max-content] items-end gap-x-4 max-sm:overflow-x-auto [&>.col]:border-l [&>.col]:border-[var(--hair)] [&>.col]:pl-4">
             {/* Receita total */}
             <div>
@@ -258,7 +267,7 @@ export default function GavPainel({
         </section>
 
           {/* Por BU: barras grossas — meta, realizado e quanto falta (26/11/2026). */}
-          <section className="panel flex flex-col p-4 xl:col-span-5">
+          <section className="gav-porbu panel flex flex-col p-4 xl:col-span-5">
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <div className="eyebrow-label">Por BU</div>
               <LegendaBala comRitmo={false} />
@@ -273,7 +282,6 @@ export default function GavPainel({
                   <LinhaBala
                     key={b}
                     grande
-                    marca={COR_BU[b]}
                     rotulo={BU_GESTAO_ROTULO[b]}
                     dica={real > 0 ? `Esta BU representa ${fmtPct((dados.porBu[b] / real) * 100)} da receita total do grupo educacional.` : undefined}
                     real={dados.porBu[b]}
