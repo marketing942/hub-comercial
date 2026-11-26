@@ -6,7 +6,7 @@
 import { COLOR } from "@/lib/brand";
 
 /** Cor da barra da META — fixa, para nunca confundir com a do realizado. */
-export const COR_META = "rgba(232,228,217,0.22)";
+export const COR_META = "rgba(232,228,217,0.34)";
 
 const BRL0 = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 

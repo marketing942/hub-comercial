@@ -77,7 +77,7 @@ export default function DirectDashboardView({
         </div>
         <div>
           <div className="mb-1.5 flex justify-end"><LegendaBarras /></div>
-          <DuasBarras real={site.valor} meta={meta} cor={temMeta ? cor : COLOR.gold} altura={28} />
+          <DuasBarras real={site.valor} meta={meta} cor={COLOR.gold} altura={28} />
         </div>
         <div className="grid grid-cols-3 gap-2.5">
           <Mini rotulo="Vendas" valor={fmtInt.format(site.qtd)} nota="unidades" />

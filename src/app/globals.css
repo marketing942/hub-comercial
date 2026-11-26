@@ -114,7 +114,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Numeros do card "Receita da empresa": o tamanho segue a LARGURA DO CARD (cqi),
    nao a da tela — assim nunca cortam, em qualquer monitor ou TV. */
 .gav-empresa { container-type: inline-size; }
-.gav-empresa .gav-num { font-size: clamp(1rem, 5.4cqi, 2rem); }
+.gav-empresa .gav-num { font-size: clamp(1rem, 5cqi, 1.85rem); }
 .gav-empresa .gav-mini { font-size: clamp(0.85rem, 3.6cqi, 1.1rem); }
 .tv-mode .gav .gav-num { font-size: clamp(1.1rem, 6cqi, 2.6rem); }
 .tv-mode .gav .gav-mini { font-size: clamp(0.95rem, 3.8cqi, 1.3rem); }

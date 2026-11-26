@@ -121,23 +121,28 @@ export default function GavPainel({
     <div className="gav space-y-3">
       {/* 1. Empresa x meta | o grafico unico, com "por origem" na base do mesmo card */}
       <div className="grid gap-3 lg:grid-cols-12">
-        <section className="gav-empresa panel p-5 lg:col-span-4 flex flex-col justify-between gap-4">
-          <div className="flex items-baseline justify-between gap-2">
+        <section className="gav-empresa panel p-4 lg:col-span-4 flex flex-col gap-3">
+          {/* Titulo + % da meta num selo, na mesma linha */}
+          <div className="flex items-center justify-between gap-2">
             <div className="eyebrow-label">Receita da empresa</div>
-            <div className="font-display text-3xl font-bold tabular-nums" style={{ color: corEmpresa }}>
-              {temMeta ? fmtPct(pct) : "—"}
-            </div>
+            <span
+              className="shrink-0 rounded-full border px-2.5 py-0.5 font-display text-[15px] font-bold tabular-nums"
+              style={{ color: corEmpresa, borderColor: `${corEmpresa}55`, background: `${corEmpresa}14` }}
+            >
+              {temMeta ? `${fmtPct(pct)} da meta` : "sem meta"}
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="min-w-0">
-              <div className="kpi-label">Receita</div>
+          {/* Realizado x meta: dois blocos iguais, no mesmo padrao dos minis abaixo */}
+          <div className="grid flex-1 grid-cols-2 gap-2.5">
+            <div className="flex min-w-0 flex-col justify-center rounded-lg bg-panel2/70 px-3 py-3" style={{ boxShadow: `inset 3px 0 0 ${COLOR.gold}` }}>
+              <div className="kpi-label !text-[11px]">Realizado</div>
               <div className="mt-1 truncate font-display font-bold leading-none tabular-nums gav-num" style={{ color: corEmpresa === COLOR.mute ? COLOR.neutral : corEmpresa }}>
                 {brl(real)}
               </div>
             </div>
-            <div className="min-w-0 border-l border-[var(--hair)] pl-3">
-              <div className="kpi-label">Meta</div>
-              <div className="mt-1 truncate font-display font-bold leading-none tabular-nums gav-num text-white/80">
+            <div className="flex min-w-0 flex-col justify-center rounded-lg bg-panel2/70 px-3 py-3" style={{ boxShadow: "inset 3px 0 0 rgba(232,228,217,0.35)" }}>
+              <div className="kpi-label !text-[11px]">Meta</div>
+              <div className="mt-1 truncate font-display font-bold leading-none tabular-nums gav-num text-white/85">
                 {temMeta ? brl(meta) : "—"}
               </div>
             </div>
@@ -197,7 +202,7 @@ export default function GavPainel({
                     </span>
                     <span className="text-[13px] font-bold tabular-nums" style={{ color: c }}>{m > 0 ? fmtPct(p) : "—"}</span>
                   </div>
-                  <DuasBarras real={v} meta={m} cor={m > 0 ? c : COLOR.gold} altura={20} />
+                  <DuasBarras real={v} meta={m} cor={COLOR.gold} altura={20} />
                 </>
               );
               return (
@@ -250,7 +255,7 @@ export default function GavPainel({
                     </span>
                     <span className="font-display text-lg font-bold tabular-nums" style={{ color: c }}>{m > 0 ? fmtPct(p) : "—"}</span>
                   </div>
-                  <DuasBarras real={v} meta={m} cor={m > 0 ? c : COLOR.gold} altura={24} />
+                  <DuasBarras real={v} meta={m} cor={COLOR.gold} altura={24} />
                   {linhas.length > 0 && (
                     <div className={`mt-2.5 grid gap-x-3 gap-y-2 border-t border-[var(--hair)] pt-2.5 ${largura(b) === 2 ? "sm:grid-cols-2" : ""}`}>
                       {linhas.map((l) => {
