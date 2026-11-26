@@ -24,8 +24,8 @@ import { Sparkles, Wand2 } from "lucide-react";
 
 import { COLOR } from "@/lib/brand";
 import { LINHAS_GRUPO, ROTULOS_GRUPO } from "@/lib/ca/linhas";
-import type { LinhaMapa, VendedorMapa } from "@/lib/ca/mapa";
-import { palpitarCategoria, palpitarVendedor } from "@/lib/ca/sugestao";
+import type { LinhaMapa } from "@/lib/ca/mapa";
+import { palpitarCategoria } from "@/lib/ca/sugestao";
 import {
   PRODUCT_LINES_COLEGIO,
   PRODUCT_LINES_CPPEM,
@@ -413,141 +413,6 @@ function LinhaEditavel({ linha }: { linha: LinhaMapa }) {
             {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
           </span>
         </div>
-      </td>
-    </tr>
-  );
-}
-
-export function TabelaVendedores({ vendedores, sellers }: { vendedores: VendedorMapa[]; sellers: { id: string; name: string; bu: string }[] }) {
-  return (
-    <section className="panel overflow-hidden p-4">
-      <p className="mb-3 max-w-3xl text-xs leading-relaxed text-white/50">
-        <strong>Vendedor</strong> credita a venda a alguém no Hub. <strong>Canal direto</strong> é
-        venda de site, sem dono. <strong>Grupo</strong> é diretoria, administrativo e quem saiu — a
-        receita entra no faturamento do grupo e de ninguém. O padrão é{" "}
-        <strong>pendente</strong>: cadastro novo no Conta Azul não credita ninguém até alguém dizer
-        o que ele é.
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[40rem] text-sm">
-          <thead>
-            <tr className="font-ui text-[11px] uppercase tracking-[.14em] text-white/40">
-              <th scope="col" className="pb-2 text-left font-semibold">Cadastro no Conta Azul</th>
-              <th scope="col" className="pb-2 text-right font-semibold">Movimentou</th>
-              <th scope="col" className="pb-2 text-left font-semibold">Destino</th>
-              <th scope="col" className="pb-2 text-left font-semibold">Vendedor do Hub</th>
-              <th scope="col" className="pb-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {vendedores.map((v) => (
-              <VendedorEditavel key={v.ca_vendedor_id} v={v} sellers={sellers} />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {vendedores.length === 0 ? (
-        <p className="py-8 text-center text-sm text-white/40">
-          Nada aqui ainda — rode uma sincronização na aba <strong>Conexão e sync</strong>.
-        </p>
-      ) : null}
-    </section>
-  );
-}
-
-function VendedorEditavel({ v, sellers }: { v: VendedorMapa; sellers: { id: string; name: string; bu: string }[] }) {
-  const router = useRouter();
-  const [salvando, startTransition] = useTransition();
-  // Palpite só enquanto está pendente — nunca sobrescreve o que já foi decidido.
-  const sug = v.destino === "pendente" ? palpitarVendedor(v.ca_nome, sellers) : null;
-  const [destino, setDestino] = useState(sug?.destino ?? v.destino);
-  const [sellerId, setSellerId] = useState(v.seller_id ?? sug?.sellerId ?? "");
-  const [erro, setErro] = useState<string | null>(null);
-
-  const [salvo, setSalvo] = useState(false);
-
-  // Salva sozinho ao mudar. "Vendedor" so grava depois de escolher quem (sem isso a
-  // venda sumiria do ranking); ate la a linha avisa em vez de gravar pela metade.
-  async function salvar(d: VendedorMapa["destino"], sid: string) {
-    setErro(null);
-    setSalvo(false);
-    if (d === "vendedor" && !sid) {
-      setErro("Escolha o vendedor do Hub.");
-      return;
-    }
-    const res = await fetch("/api/ca/vendedores", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ca_vendedor_id: v.ca_vendedor_id, destino: d, seller_id: d === "vendedor" ? sid : null }),
-    });
-    const j = (await res.json()) as { error?: string };
-    if (!res.ok) {
-      setErro(j.error ?? "Falhou.");
-      return;
-    }
-    setSalvo(true);
-    startTransition(() => router.refresh());
-  }
-
-  return (
-    <tr className="border-t border-[var(--hair)]">
-      <td className="py-2 pr-3 align-top">
-        <p className={v.destino === "pendente" ? "font-medium" : "text-white/60"}>{v.ca_nome || v.ca_vendedor_id}</p>
-        <p className="text-[11px] text-white/25">{v.ca_vendedor_id.slice(0, 8)}</p>
-        {sug ? (
-          <p className="mt-0.5 inline-flex items-center gap-1 text-[11px]" style={{ color: COLOR.gold }}>
-            <Sparkles className="h-3 w-3" />
-            sugerido: {sug.porque} — <strong>não salvo</strong>
-          </p>
-        ) : null}
-        {erro ? (
-          <p className="mt-0.5 text-[11px]" style={{ color: COLOR.danger }}>
-            {erro}
-          </p>
-        ) : null}
-      </td>
-      <td className="py-2 pr-3 text-right align-top tabular-nums text-white/60">
-        {brl(v.valor)}
-        <span className="block text-[11px] text-white/30">{v.vendas} vendas</span>
-      </td>
-      <td className="py-2 pr-3 align-top">
-        <select
-          className="input !py-1 text-xs"
-          value={destino}
-          onChange={(e) => {
-            const d = e.target.value as VendedorMapa["destino"];
-            setDestino(d);
-            void salvar(d, sellerId);
-          }}
-        >
-          <option value="pendente">Pendente</option>
-          <option value="vendedor">Vendedor</option>
-          <option value="canal_direto">Canal direto</option>
-          <option value="grupo">Grupo</option>
-        </select>
-      </td>
-      <td className="py-2 pr-3 align-top">
-        <select
-          className="input !py-1 text-xs"
-          value={sellerId}
-          onChange={(e) => {
-            setSellerId(e.target.value);
-            void salvar(destino, e.target.value);
-          }}
-          disabled={destino !== "vendedor"}
-        >
-          <option value="">—</option>
-          {sellers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className="py-2 align-top">
-        <span className="text-[11px]" style={{ color: erro ? COLOR.danger : COLOR.ok }}>
-          {salvando ? "Salvando…" : salvo ? "Salvo ✓" : ""}
-        </span>
       </td>
     </tr>
   );

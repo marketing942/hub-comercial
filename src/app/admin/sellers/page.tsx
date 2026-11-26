@@ -1,58 +1,62 @@
-import { listSellers } from "@/lib/data";
-import { lerTudo } from "@/lib/ca/ler";
+import { listSellers, buListOf } from "@/lib/data";
+import { listarVendedores } from "@/lib/ca/mapa";
 import { nomeDoCA } from "@/lib/ca/nomes";
 import ConfiguracoesSubnav from "@/components/ConfiguracoesSubnav";
-import SellersClient from "./sellers-client";
-import { TabelaVendedores } from "@/components/gav/MapaClient";
-import { listarVendedores } from "@/lib/ca/mapa";
+import SellersClient, { type Pessoa } from "./sellers-client";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Uma lista so (26/11/2026): TODOS os cadastros de vendedor do Conta Azul, com o
+ * destino de cada um; quem e "Vendedor" ganha BU, status e senha do Hub.
+ * Cadastros ligados ao mesmo vendedor do Hub aparecem numa linha so.
+ */
 export default async function SellersPage() {
-  const [sellers, vendedoresCA] = await Promise.all([
-    listSellers(),
-    // Ligacao cadastro do Conta Azul -> vendedor do Hub (veio da Classificacao em 26/11/2026).
-    listarVendedores().catch(() => []),
-  ]);
-  const pendentesCA = vendedoresCA.filter((v) => v.destino === "pendente").length;
-  // Cadastros de vendedor do Conta Azul (de onde vem o nome). Sem a tabela, lista vazia.
-  const caRows = await lerTudo<{ ca_vendedor_id: string; ca_nome: string | null; destino: string | null; seller_id: string | null }>(
-    "ca_vendedores",
-    "ca_vendedor_id, ca_nome, destino, seller_id",
-    { ordenarPor: "ca_vendedor_id" },
-  ).catch(() => []);
-  const caVendedores = caRows
-    .filter((v) => v.ca_nome)
-    .map((v) => ({ id: v.ca_vendedor_id, nome: nomeDoCA(v.ca_nome), destino: v.destino ?? "pendente", sellerId: v.seller_id }))
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  const ligados = new Set(caVendedores.filter((v) => v.sellerId).map((v) => v.sellerId as string));
+  const [sellers, ca] = await Promise.all([listSellers(), listarVendedores()]);
+  const porId = new Map(sellers.map((s) => [s.id, s]));
+
+  const grupos = new Map<string, typeof ca>();
+  for (const c of ca) {
+    const k = c.seller_id && porId.has(c.seller_id) ? c.seller_id : `ca:${c.ca_vendedor_id}`;
+    grupos.set(k, [...(grupos.get(k) ?? []), c]);
+  }
+
+  const hub = (id: string | null) => {
+    const s = id ? porId.get(id) : undefined;
+    return s ? { id: s.id, bus: buListOf(s), active: Boolean(s.active), temSenha: Boolean(s.has_password) } : null;
+  };
+
+  const pessoas: Pessoa[] = Array.from(grupos.entries()).map(([k, regs]) => {
+    const vend = regs.find((r) => r.destino === "vendedor");
+    const vinculado = hub(k.startsWith("ca:") ? null : k);
+    return {
+      chave: k,
+      nome: (vinculado && porId.get(k)?.name) || nomeDoCA(regs[0].ca_nome) || regs[0].ca_vendedor_id,
+      cadastros: regs.map((r) => nomeDoCA(r.ca_nome) || r.ca_vendedor_id),
+      caIds: regs.map((r) => r.ca_vendedor_id),
+      destino: vend ? "vendedor" : regs.some((r) => r.destino === "pendente") ? "pendente" : regs[0].destino,
+      vendas: regs.reduce((a, r) => a + r.vendas, 0),
+      valor: regs.reduce((a, r) => a + r.valor, 0),
+      hub: vinculado,
+    };
+  });
+
+  // Vendedor do Hub sem nenhum cadastro no Conta Azul: aparece para nao sumir.
+  for (const s of sellers) {
+    if (grupos.has(s.id)) continue;
+    pessoas.push({ chave: s.id, nome: s.name, cadastros: [], caIds: [], destino: "vendedor", vendas: 0, valor: 0, hub: hub(s.id) });
+  }
+
   return (
     <div className="space-y-4">
       <ConfiguracoesSubnav />
       <div>
         <h1 className="text-2xl font-bold">Vendedores</h1>
         <p className="text-sm text-white/50">
-          O nome vem do Conta Azul: escolha o vendedor de lá e diga em quais BUs ele atua. Aqui ficam também o status, a senha e a BU de cada um.
+          Todos os vendedores vem do Conta Azul. Escolha o destino de cada um; quem for <b>Vendedor</b> recebe BU, status e senha.
         </p>
       </div>
-      <SellersClient
-        initial={sellers.map((s) => ({ ...s, ligadoAoCA: ligados.has(s.id) }))}
-        caDisponiveis={caVendedores.filter((v) => !v.sellerId).map((v) => ({ id: v.id, nome: v.nome, destino: v.destino }))}
-      />
-      <div className="pt-2">
-        <h2 className="text-lg font-bold">
-          Ligação com o Conta Azul
-          {pendentesCA > 0 && (
-            <span className="ml-2 align-middle font-ui text-[11px] font-bold uppercase tracking-[0.12em] text-warning">
-              {pendentesCA} pendente{pendentesCA > 1 ? "s" : ""}
-            </span>
-          )}
-        </h2>
-        <p className="text-sm text-white/50">
-          Para as vendas de um vendedor novo aparecerem no Hub, diga aqui de quem é cada cadastro de vendedor do Conta Azul.
-        </p>
-      </div>
-      <TabelaVendedores vendedores={vendedoresCA} sellers={sellers.map((s) => ({ id: s.id, name: s.name, bu: s.bu }))} />
+      <SellersClient pessoas={pessoas} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { BU_COLOR, COLOR, tonePctMeta } from "@/lib/brand";
 import { isQtdPrimary } from "@/lib/products";
 import UnifiedDailyChart, { type UnifiedChartRow } from "@/components/charts/UnifiedDailyChartLazy";
 import Indicador, { type Linha } from "@/components/Indicador";
+import MatriculasColegio from "@/components/MatriculasColegio";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 export default function DashboardView({
@@ -172,7 +173,8 @@ export default function DashboardView({
   );
 
   return (
-    <div className="space-y-2">
+    <div className={snap.matriculas ? "com-matriculas space-y-2" : "space-y-2"}>
+      {snap.matriculas && <MatriculasColegio {...snap.matriculas} />}
 
       {/* 1) Placar + evolucao: a historia do mes de relance */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-2">
@@ -246,7 +248,7 @@ function ScoreRing({ pct, color, size = 188 }: { pct: number; color: string; siz
   const c = 2 * Math.PI * r;
   const v = Math.max(0, Math.min(100, pct));
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }}>
+    <div className="anel-meta relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} fill="none" />
         <circle

@@ -14,7 +14,7 @@ export type SidebarItem = {
 
 // Telas de Configuracoes (admin): a engrenagem ao lado do Sair fica ativa nelas.
 export const CONFIG_HREF = "/admin/sellers";
-const CONFIG_PREFIXES = ["/admin/sellers", "/admin/goals", "/admin/comissoes", "/admin/leads", "/admin/ano", "/admin/classificacao", "/admin/gav/conexao"];
+const CONFIG_PREFIXES = ["/admin/sellers", "/admin/goals", "/admin/comissoes", "/admin/leads", "/admin/colegio", "/admin/ano", "/admin/classificacao", "/admin/gav/conexao"];
 
 // Navegacao no topo: libera toda a largura da tela pro dashboard (TV).
 export default function Sidebar({

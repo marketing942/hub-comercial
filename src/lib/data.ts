@@ -1,4 +1,6 @@
 import * as React from "react";
+import { resumir, type ResumoColegio } from "./colegioMatriculas";
+import { carregarMatriculas } from "./colegioMatriculasServer";
 import { supabaseAdmin } from "./supabase";
 import {
   computeSellerStats,
@@ -1384,6 +1386,8 @@ export async function directSnapshot(opts?: {
 }
 
 export type DashboardSnapshot = {
+  /** So o Colegio, e so depois de preenchido: matriculas do proximo ano letivo. */
+  matriculas: { resumo: ResumoColegio; atualizadoEm: string | null } | null;
   bu: "cppem" | "unicive" | "colegio_cppem";
   series: BUSeries;
   sellers: SellerStats[];
@@ -1400,8 +1404,15 @@ export async function dashboardSnapshot(
   // as mesmas consultas uma vez por BU.
   allStats?: SellerStats[]
 ): Promise<DashboardSnapshot> {
-  // A meta de longo prazo (matriculas do Colegio) saiu do sistema em 26/11/2026.
-  const [series, all] = await Promise.all([buSeries(bu, opts), allStats ?? statsForAll(opts)]);
+  // A meta de longo prazo (matriculas do Colegio) saiu do sistema em 26/11/2026; no lugar,
+  // o Colegio mostra as matriculas do proximo ano digitadas em Configuracoes -> Colegio.
+  const [series, all, cargaMatriculas] = await Promise.all([
+    buSeries(bu, opts),
+    allStats ?? statsForAll(opts),
+    bu === "colegio_cppem" ? carregarMatriculas() : null,
+  ]);
+  const resumo = cargaMatriculas ? resumir(cargaMatriculas.grade) : null;
+  const matriculas = resumo?.preenchido ? { resumo, atualizadoEm: cargaMatriculas!.atualizadoEm } : null;
   const sellers = all.filter((s) => s.bu === bu);
   // Leads sao por vendedor (sem distincao de BU). Pra evitar dupla contagem
   // em vendedor multi-BU, dedup por sellerId.
@@ -1412,7 +1423,7 @@ export async function dashboardSnapshot(
   const leadsTotal = Array.from(leadsBySeller.values()).reduce((a, b) => a + b, 0);
   const vendas = sellers.reduce((a, b) => a + b.vendasCount, 0);
   const taxaConversao = leadsTotal > 0 ? (vendas / leadsTotal) * 100 : 0;
-  return { bu, series, sellers, leadsTotal, taxaConversao };
+  return { bu, series, sellers, leadsTotal, taxaConversao, matriculas };
 }
 
 export { daysInMonth, daysRemainingIncludingToday, todayDayOfMonth, periodNow };

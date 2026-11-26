@@ -1,189 +1,128 @@
 "use client";
-import { useState, useMemo } from "react";
+/**
+ * Vendedores (Configuracoes): uma tabela so, vinda do Conta Azul. Cada mudanca
+ * salva na hora e a pagina rele o banco (`router.refresh`). Nao existe criar nem
+ * excluir: o cadastro e do Conta Azul.
+ */
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Power, Trash2, Search, Key, X, Check, RotateCw } from "lucide-react";
-import { BU_LABEL } from "@/lib/brand";
+import { Power, Search, Key, X, Check, RotateCw } from "lucide-react";
+import { BU_LABEL, COLOR } from "@/lib/brand";
 import { ALL_BUS, type BU } from "@/lib/products";
 
-type Seller = {
-  id: string;
-  name: string;
-  bu: BU;
-  bus?: BU[];
-  active: boolean;
-  avatar_color: string;
-  has_password?: boolean;
-  /** O nome vem do cadastro do Conta Azul ligado a este vendedor. */
-  ligadoAoCA?: boolean;
+type Destino = "vendedor" | "canal_direto" | "grupo" | "pendente";
+
+export type Pessoa = {
+  chave: string;
+  nome: string;
+  /** Nomes dos cadastros no Conta Azul (mais de um = duplicado la). */
+  cadastros: string[];
+  caIds: string[];
+  destino: Destino;
+  vendas: number;
+  valor: number;
+  /** Vendedor do Hub ligado (guardado mesmo quando o destino deixa de ser vendedor). */
+  hub: { id: string; bus: BU[]; active: boolean; temSenha: boolean } | null;
 };
 
-type CaDisponivel = { id: string; nome: string; destino: string };
+const ROTULO: Record<Destino, string> = { vendedor: "Vendedor", canal_direto: "Canal direto", grupo: "Grupo", pendente: "Pendente" };
+const ORDEM: Record<Destino, number> = { pendente: 0, vendedor: 1, canal_direto: 2, grupo: 3 };
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
-function busOf(s: Seller): BU[] {
-  const arr = Array.isArray(s.bus)
-    ? s.bus.filter((x) => x === "cppem" || x === "unicive" || x === "colegio_cppem")
-    : [];
-  return arr.length > 0 ? Array.from(new Set(arr)) : [s.bu];
-}
+const corBu = (b: BU) =>
+  b === "cppem" ? "bg-cppem/20 text-cppem border-cppem/40" : b === "unicive" ? "bg-unicive/20 text-unicive border-unicive/40" : "bg-colegio/20 text-colegio border-colegio/40";
 
-type StatusFilter = "all" | "active" | "inactive";
-type BuFilter = "all" | BU;
-
-export default function SellersClient({ initial, caDisponiveis }: { initial: Seller[]; caDisponiveis: CaDisponivel[] }) {
+export default function SellersClient({ pessoas }: { pessoas: Pessoa[] }) {
   const router = useRouter();
-  const [list, setList] = useState(initial);
-  const [caId, setCaId] = useState("");
-  const [disponiveis, setDisponiveis] = useState(caDisponiveis);
-  const [erroAdd, setErroAdd] = useState<string | null>(null);
-  const [bus, setBus] = useState<BU[]>(["cppem"]);
-  const [busy, setBusy] = useState(false);
+  const [atualizando, startTransition] = useTransition();
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [erro, setErro] = useState<Record<string, string>>({});
+  // Linha marcada como "Vendedor" que ainda nao tem BU: so grava quando a BU for escolhida.
+  const [querVendedor, setQuerVendedor] = useState<Record<string, boolean>>({});
+  const [busca, setBusca] = useState("");
+  const [destinoF, setDestinoF] = useState<"todos" | Destino>("todos");
+  const [buF, setBuF] = useState<"all" | BU>("all");
+  const [statusF, setStatusF] = useState<"all" | "active" | "inactive">("all");
+  const [senhaDe, setSenhaDe] = useState<{ id: string; name: string; has_password: boolean } | null>(null);
 
-  // Filtros da tabela
-  const [search, setSearch] = useState("");
-  const [buFilter, setBuFilter] = useState<BuFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  // Voltando pela navegacao o Next pode reaproveitar a pagina antiga: rele.
+  useEffect(() => router.refresh(), [router]);
 
-  // Modal de senha
-  const [pwTarget, setPwTarget] = useState<Seller | null>(null);
-
-  function toggleBu(b: BU) {
-    setBus((prev) => (prev.includes(b) ? prev.filter((x) => x !== b) : [...prev, b]));
-  }
-
-  async function add() {
-    if (!caId || bus.length === 0) return;
-    setBusy(true);
-    setErroAdd(null);
-    const r = await fetch("/api/sellers", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ca_vendedor_id: caId, bus, bu: bus[0] }),
-    });
-    setBusy(false);
-    if (r.ok) {
-      const { data } = await r.json();
-      setList((l) => [...l, { ...data, ligadoAoCA: true }].sort((a, b) => a.name.localeCompare(b.name)));
-      setDisponiveis((d) => d.filter((x) => x.id !== caId));
-      setCaId("");
-      router.refresh();
-    } else {
-      setErroAdd((await r.json().catch(() => ({}))).error || "Nao foi possivel adicionar.");
+  async function enviar(chave: string, url: string, method: string, body: unknown) {
+    setOcupado(chave);
+    setErro((e) => ({ ...e, [chave]: "" }));
+    const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    if (!r?.ok) {
+      const j = await r?.json().catch(() => null);
+      setErro((e) => ({ ...e, [chave]: j?.error || "Nao foi possivel salvar." }));
     }
+    setOcupado(null);
+    startTransition(() => router.refresh());
+    return Boolean(r?.ok);
   }
 
-  async function toggle(s: Seller) {
-    await fetch(`/api/sellers/${s.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ active: !s.active }),
-    });
-    setList((l) => l.map((x) => (x.id === s.id ? { ...x, active: !x.active } : x)));
-    router.refresh();
+  const destino = (p: Pessoa, d: Destino, extra?: { bus?: BU[]; seller_id?: string }) =>
+    enviar(p.chave, "/api/ca/vendedores", "POST", { ca_vendedor_ids: p.caIds, destino: d, ...extra });
+
+  function mudarDestino(p: Pessoa, d: Destino) {
+    setQuerVendedor((q) => ({ ...q, [p.chave]: d === "vendedor" && !p.hub }));
+    // Sem vendedor no Hub ainda: espera a BU (ou a pessoa ja existente) para gravar.
+    if (d === "vendedor" && !p.hub) return;
+    void destino(p, d);
   }
 
-  async function changeBUs(s: Seller, newBus: BU[]) {
-    if (newBus.length === 0) return;
-    await fetch(`/api/sellers/${s.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ bus: newBus }),
-    });
-    setList((l) => l.map((x) => (x.id === s.id ? { ...x, bus: newBus, bu: newBus[0] } : x)));
-    router.refresh();
+  function alternarBu(p: Pessoa, b: BU) {
+    if (!p.hub) return void destino(p, "vendedor", { bus: [b] });
+    const tem = p.hub.bus.includes(b);
+    const nova = tem ? p.hub.bus.filter((x) => x !== b) : [...p.hub.bus, b];
+    if (nova.length === 0) return;
+    void enviar(p.chave, `/api/sellers/${p.hub.id}`, "PATCH", { bus: nova });
   }
 
-  async function remove(s: Seller) {
-    if (!confirm(`Remover ${s.name}? Vendas e metas serao apagadas.`)) return;
-    await fetch(`/api/sellers/${s.id}`, { method: "DELETE" });
-    setList((l) => l.filter((x) => x.id !== s.id));
-    router.refresh();
-  }
+  const existentes = useMemo(() => pessoas.filter((p) => p.hub).map((p) => ({ id: p.hub!.id, nome: p.nome })).sort((a, b) => a.nome.localeCompare(b.nome)), [pessoas]);
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return list
-      .filter((s) => (statusFilter === "all" ? true : statusFilter === "active" ? s.active : !s.active))
-      .filter((s) => (buFilter === "all" ? true : busOf(s).includes(buFilter)))
-      .filter((s) => (term ? s.name.toLowerCase().includes(term) : true))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [list, search, buFilter, statusFilter]);
+  const linhas = useMemo(() => {
+    const t = busca.trim().toLowerCase();
+    return pessoas
+      .filter((p) => destinoF === "todos" || p.destino === destinoF)
+      .filter((p) => buF === "all" || (p.destino === "vendedor" && p.hub?.bus.includes(buF)))
+      .filter((p) => statusF === "all" || (p.destino === "vendedor" && !!p.hub && p.hub.active === (statusF === "active")))
+      .filter((p) => !t || [p.nome, ...p.cadastros].some((n) => n.toLowerCase().includes(t)))
+      .sort(
+        (a, b) =>
+          ORDEM[a.destino] - ORDEM[b.destino] ||
+          Number(b.hub?.active ?? false) - Number(a.hub?.active ?? false) ||
+          a.nome.localeCompare(b.nome, "pt-BR")
+      );
+  }, [pessoas, busca, destinoF, buF, statusF]);
 
-  const counters = useMemo(() => {
-    const active = list.filter((s) => s.active).length;
-    return { total: list.length, active, inactive: list.length - active };
-  }, [list]);
+  const vendedores = pessoas.filter((p) => p.destino === "vendedor" && p.hub);
+  const ativos = vendedores.filter((p) => p.hub!.active).length;
+  const pendentes = pessoas.filter((p) => p.destino === "pendente").length;
 
   return (
-    <div className="space-y-4">
-      {/* Form de adicionar */}
-      <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3 items-end">
-          <div>
-            <label className="label">Vendedor do Conta Azul</label>
-            <select className="input" value={caId} onChange={(e) => setCaId(e.target.value)}>
-              <option value="">{disponiveis.length ? "Escolha quem adicionar…" : "Todos os vendedores do Conta Azul já foram adicionados"}</option>
-              {disponiveis.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.nome}
-                </option>
-              ))}
-            </select>
-            {erroAdd && <p className="mt-1 text-xs text-danger">{erroAdd}</p>}
-          </div>
-          <div>
-            <label className="label">BU(s)</label>
-            <div className="flex gap-2 flex-wrap">
-              {ALL_BUS.map((b) => {
-                const active = bus.includes(b);
-                return (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => toggleBu(b)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                      active
-                        ? "bg-accent text-black border-accent"
-                        : "bg-panel2 text-white/60 border-border hover:text-white"
-                    }`}
-                  >
-                    {BU_LABEL[b]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <button
-            className="btn-primary"
-            onClick={add}
-            disabled={busy || !caId || bus.length === 0}
-          >
-            <Plus className="w-4 h-4" /> Adicionar
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros + contagens */}
-      <div className="card">
+    <div className="space-y-3">
+      <div className="panel p-3">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
           <div>
             <label className="label">Buscar por nome</label>
             <div className="relative">
               <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                className="input pl-9"
-                placeholder="Digite o nome do vendedor..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <input className="input pl-9" placeholder="Digite o nome..." value={busca} onChange={(e) => setBusca(e.target.value)} />
             </div>
           </div>
           <div>
+            <label className="label">Destino</label>
+            <select className="input h-10" value={destinoF} onChange={(e) => setDestinoF(e.target.value as typeof destinoF)}>
+              <option value="todos">Todos</option>
+              {(Object.keys(ROTULO) as Destino[]).map((d) => (
+                <option key={d} value={d}>{ROTULO[d]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="label">BU</label>
-            <select
-              className="input h-10"
-              value={buFilter}
-              onChange={(e) => setBuFilter(e.target.value as BuFilter)}
-            >
+            <select className="input h-10" value={buF} onChange={(e) => setBuF(e.target.value as typeof buF)}>
               <option value="all">Todas</option>
               {ALL_BUS.map((b) => (
                 <option key={b} value={b}>{BU_LABEL[b]}</option>
@@ -192,127 +131,139 @@ export default function SellersClient({ initial, caDisponiveis }: { initial: Sel
           </div>
           <div>
             <label className="label">Status</label>
-            <select
-              className="input h-10"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            >
+            <select className="input h-10" value={statusF} onChange={(e) => setStatusF(e.target.value as typeof statusF)}>
               <option value="all">Todos</option>
               <option value="active">Ativos</option>
               <option value="inactive">Inativos</option>
             </select>
           </div>
-          <div className="text-[11px] text-white/60 leading-tight pb-2">
-            Total: <b className="text-white">{counters.total}</b>
-            <span className="text-white/40"> · </span>
-            <span className="text-success">{counters.active} ativos</span>
-            <span className="text-white/40"> · </span>
-            <span className="text-white/50">{counters.inactive} inativos</span>
-          </div>
+        </div>
+        <div className="mt-2 text-[11px] text-white/55">
+          {pessoas.length} no Conta Azul · <span className="text-success">{ativos} vendedores ativos</span> · {vendedores.length - ativos} inativos
+          {pendentes > 0 && <span className="text-warning"> · {pendentes} pendente{pendentes > 1 ? "s" : ""}</span>}
         </div>
       </div>
 
-      {/* Tabela unica */}
-      <div className="card p-0 overflow-hidden">
+      <div className="panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table-stack w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-wider text-white/40 bg-panel2/60">
+            <thead className="text-[10px] uppercase tracking-wider text-white/40">
               <tr className="text-left">
-                <th className="p-3">Nome</th>
-                <th className="p-3">Atua em</th>
+                <th className="p-3">Nome no Conta Azul</th>
+                <th className="p-3 text-right">Movimentou</th>
+                <th className="p-3 w-44">Destino</th>
+                <th className="p-3">BU</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Senha</th>
-                <th className="p-3 text-right w-36">Acoes</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {linhas.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-6 text-center text-white/40 text-xs">
-                    Nenhum vendedor encontrado com esses filtros.
+                  <td colSpan={6} className="p-6 text-center text-white/40 text-xs">
+                    {pessoas.length === 0 ? "Nenhum vendedor recebido do Conta Azul ainda." : "Ninguem encontrado com esses filtros."}
                   </td>
                 </tr>
               )}
-              {filtered.map((s) => {
-                const sBus = busOf(s);
+              {linhas.map((p) => {
+                const aguardando = !!querVendedor[p.chave] && !p.hub;
+                const eVendedor = p.destino === "vendedor" || aguardando;
+                const trabalhando = ocupado === p.chave;
                 return (
-                  <tr key={s.id} className="border-t border-border hover:bg-panel2/30">
+                  <tr key={p.chave} className="border-t border-[var(--hair)] align-top">
                     <td data-label="Nome" className="p-3">
-                      <div className="font-medium">{s.name}</div>
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: s.ligadoAoCA ? "#87847a" : "#f0b44c" }}>
-                        {s.ligadoAoCA ? "nome do Conta Azul" : "sem vínculo com o Conta Azul"}
-                      </div>
+                      <div className={eVendedor || p.destino === "pendente" ? "font-medium" : "text-white/60"}>{p.nome}</div>
+                      {p.cadastros.length > 1 && <div className="text-[11px] text-white/40">{p.cadastros.length} cadastros no Conta Azul</div>}
+                      {p.caIds.length === 0 && <div className="text-[11px] text-warning">sem vinculo com o Conta Azul</div>}
+                      {erro[p.chave] && <div className="text-[11px] text-danger">{erro[p.chave]}</div>}
                     </td>
-                    <td data-label="Atua em" className="p-3">
-                      <div className="flex gap-1.5 flex-wrap">
-                        {ALL_BUS.map((b) => {
-                          const active = sBus.includes(b);
-                          return (
-                            <button
-                              key={b}
-                              onClick={() => {
-                                const next = active
-                                  ? sBus.filter((x) => x !== b)
-                                  : [...sBus, b];
-                                if (next.length === 0) return;
-                                changeBUs(s, next);
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${
-                                active
-                                  ? b === "cppem"
-                                    ? "bg-cppem/20 text-cppem border-cppem/40"
-                                    : b === "unicive"
-                                    ? "bg-unicive/20 text-unicive border-unicive/40"
-                                    : "bg-colegio/20 text-colegio border-colegio/40"
-                                  : "bg-panel2 text-white/40 border-border"
-                              }`}
-                            >
-                              {BU_LABEL[b]}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <td data-label="Movimentou" className="p-3 text-right tabular-nums text-white/60">
+                      {brl(p.valor)}
+                      <span className="block text-[11px] text-white/35">{p.vendas} venda{p.vendas === 1 ? "" : "s"}</span>
                     </td>
-                    <td data-label="Status" className="p-3">
-                      <span
-                        className={`chip ${
-                          s.active
-                            ? "bg-success/15 text-success"
-                            : "bg-white/10 text-white/50"
-                        }`}
+                    <td data-label="Destino" className="p-3">
+                      <select
+                        aria-label={`Destino de ${p.nome}`}
+                        className="input !py-1.5 text-xs"
+                        value={aguardando ? "vendedor" : p.destino}
+                        disabled={p.caIds.length === 0 || trabalhando || atualizando}
+                        onChange={(e) => mudarDestino(p, e.target.value as Destino)}
                       >
-                        {s.active ? "Ativo" : "Inativo"}
-                      </span>
+                        {(Object.keys(ROTULO) as Destino[]).map((d) => (
+                          <option key={d} value={d}>{ROTULO[d]}</option>
+                        ))}
+                      </select>
+                      {trabalhando && <div className="mt-1 text-[11px] text-white/45">Salvando…</div>}
                     </td>
-                    <td data-label="Senha" className="p-3">
-                      {s.has_password ? (
-                        <span className="chip bg-success/15 text-success">Definida</span>
+                    <td data-label="BU" className="p-3">
+                      {eVendedor ? (
+                        <>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {ALL_BUS.map((b) => (
+                              <button
+                                key={b}
+                                type="button"
+                                disabled={trabalhando}
+                                onClick={() => alternarBu(p, b)}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition ${
+                                  p.hub?.bus.includes(b) ? corBu(b) : "bg-panel2 text-white/40 border-border"
+                                }`}
+                              >
+                                {BU_LABEL[b]}
+                              </button>
+                            ))}
+                          </div>
+                          {aguardando && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: COLOR.warning }}>
+                              Escolha a BU para ativar.
+                              {existentes.length > 0 && (
+                                <select
+                                  aria-label={`Mesma pessoa que ${p.nome}`}
+                                  className="input !w-auto !py-0.5 !text-[11px]"
+                                  value=""
+                                  onChange={(e) => e.target.value && void destino(p, "vendedor", { seller_id: e.target.value })}
+                                >
+                                  <option value="">ou e a mesma pessoa que…</option>
+                                  {existentes.map((x) => (
+                                    <option key={x.id} value={x.id}>{x.nome}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          )}
+                        </>
                       ) : (
-                        <span className="chip bg-warning/15 text-warning">Nao definida</span>
+                        <span className="text-white/25">—</span>
                       )}
                     </td>
-                    <td data-label="" className="p-3 text-right">
-                      <button
-                        className="btn-ghost h-8 px-2 mr-1"
-                        onClick={() => setPwTarget(s)}
-                        title="Definir / redefinir senha"
-                      >
-                        <Key className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        className="btn-ghost h-8 px-2 mr-1"
-                        onClick={() => toggle(s)}
-                        title={s.active ? "Inativar" : "Ativar"}
-                      >
-                        <Power className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        className="btn-danger h-8 px-2"
-                        onClick={() => remove(s)}
-                        title="Remover"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <td data-label="Status" className="p-3">
+                      {eVendedor && p.hub ? (
+                        <button
+                          type="button"
+                          disabled={trabalhando}
+                          onClick={() => void enviar(p.chave, `/api/sellers/${p.hub!.id}`, "PATCH", { active: !p.hub!.active })}
+                          title={p.hub.active ? "Inativar" : "Ativar"}
+                          className={`chip ${p.hub.active ? "bg-success/15 text-success" : "bg-white/10 text-white/50"}`}
+                        >
+                          <Power className="h-3 w-3" /> {p.hub.active ? "Ativo" : "Inativo"}
+                        </button>
+                      ) : (
+                        <span className="text-white/25">—</span>
+                      )}
+                    </td>
+                    <td data-label="Senha" className="p-3">
+                      {eVendedor && p.hub ? (
+                        <button
+                          type="button"
+                          className={`chip ${p.hub.temSenha ? "bg-success/15 text-success" : "bg-warning/15 text-warning"}`}
+                          onClick={() => setSenhaDe({ id: p.hub!.id, name: p.nome, has_password: p.hub!.temSenha })}
+                          title="Definir / redefinir senha"
+                        >
+                          <Key className="h-3 w-3" /> {p.hub.temSenha ? "Definida" : "Definir"}
+                        </button>
+                      ) : (
+                        <span className="text-white/25">—</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -321,15 +272,8 @@ export default function SellersClient({ initial, caDisponiveis }: { initial: Sel
           </table>
         </div>
       </div>
-      {/* Modal de senha */}
-      <PasswordModal
-        target={pwTarget}
-        onClose={() => setPwTarget(null)}
-        onDone={(id) => {
-          setList((l) => l.map((x) => (x.id === id ? { ...x, has_password: true } : x)));
-          router.refresh();
-        }}
-      />
+
+      <PasswordModal target={senhaDe} onClose={() => setSenhaDe(null)} onDone={() => startTransition(() => router.refresh())} />
     </div>
   );
 }
@@ -339,9 +283,9 @@ function PasswordModal({
   onClose,
   onDone,
 }: {
-  target: Seller | null;
+  target: { id: string; name: string; has_password: boolean } | null;
   onClose: () => void;
-  onDone: (id: string) => void;
+  onDone: () => void;
 }) {
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
@@ -369,7 +313,7 @@ function PasswordModal({
     });
     setSaving(false);
     if (r.ok) {
-      onDone(target.id);
+      onDone();
       setPw("");
       setPw2("");
       onClose();
@@ -385,7 +329,7 @@ function PasswordModal({
       onClick={() => !saving && onClose()}
     >
       <div
-        className="bg-panel border border-border rounded-2xl shadow-glow w-full max-w-sm overflow-hidden"
+        className="bg-panel border border-border rounded-md shadow-glow w-full max-w-sm overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
