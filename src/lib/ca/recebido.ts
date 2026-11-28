@@ -25,6 +25,8 @@ export interface ResultadoEspelho {
   categorias: number;
   /** Itens órfãos removidos: a venda deles não veio mais (cancelada, por exemplo). */
   orfaosRemovidos: number;
+  /** `ca_vendas.categoria_evento_ca_id` ainda não existe: rodar `supabase/ca-05-categoria-evento.sql`. */
+  colunaEventoAusente?: boolean;
 }
 
 const num = (v: unknown): number | null => {
@@ -65,6 +67,29 @@ export async function gravarEspelho(
       vendedor_ca_id: txt(v.vendedor_ca_id),
       vendedor_nome: txt(v.vendedor_nome),
       categoria_ca_id: txt(v.categoria_ca_id),
+      /**
+       * A categoria do EVENTO FINANCEIRO (recebível) — que NÃO é a da venda.
+       *
+       * No Conta Azul a venda tem uma categoria e o recebível dela pode ter
+       * outra. O DRE e a aba Faturamento do Jarvis classificam receita pela do
+       * EVENTO; aqui só existia a da VENDA. Medido 27/11/2026 (set–nov): de 1.807
+       * recebíveis ligados a venda, **496 divergiam, R$ 59.515,91**:
+       *
+       *   R$ 30.625,64  o evento diz MATRÍCULA UNICIVE, a venda não tem categoria
+       *   R$ 14.988,66  o evento diz EVENTOS CPPEM, a venda diz TURMAS PRESENCIAIS
+       *
+       * É por isso que EVENTOS CPPEM não aparecia na Gestão à Vista: nenhuma
+       * VENDA carrega essa categoria — o dinheiro estava aqui, dentro de TURMAS
+       * PRESENCIAIS. O Jarvis descobre a ligação pela descrição do evento
+       * ("Venda 1793378733 / NF-e:6859" → `numero`); 1.807 de 1.807 casaram.
+       *
+       * ⚠️ COLUNA PRÓPRIA, e `categoria_ca_id` continua sendo a da venda.
+       * `normaliza.ts` usa esse campo para DOIS caminhos — a Gestão à Vista e
+       * `sales` (meta e comissão). Sobrescrever mandaria aquelas 247 vendas para
+       * uma categoria que não é a que o item e as regras esperam, e o crédito do
+       * vendedor mudaria sem ninguém pedir.
+       */
+      categoria_evento_ca_id: txt(v.categoria_evento_ca_id),
       detalhe_versao: num(v.detalhe_versao),
       detalhe_em: agora,
       visto_em: agora,
@@ -90,11 +115,28 @@ export async function gravarEspelho(
   }
 
   // ---- regrava --------------------------------------------------------
+  /**
+   * `categoria_evento_ca_id` é coluna nova (`supabase/ca-05-categoria-evento.sql`).
+   *
+   * Se o SQL não tiver sido rodado, o PostgREST devolve 42703 e o empurrão INTEIRO
+   * falharia — o Hub ficaria sem espelho por causa de um campo acessório. Então:
+   * tenta com o campo e, se a coluna não existir, regrava sem ele e avisa.
+   */
+  let semColunaEvento = false;
+  const semCampo = (lote: typeof vendas) => lote.map(({ categoria_evento_ca_id: _ignorado, ...resto }) => resto);
   for (let i = 0; i < vendas.length; i += 500) {
+    const lote = vendas.slice(i, i + 500);
     const { error } = await supabaseAdmin
       .from("ca_vendas")
-      .upsert(vendas.slice(i, i + 500), { onConflict: "ca_id" });
-    if (error) throw new Error(`gravar ca_vendas: ${error.message}`);
+      .upsert(semColunaEvento ? semCampo(lote) : lote, { onConflict: "ca_id" });
+    if (error) {
+      const colunaFaltando = error.code === "42703" || /categoria_evento_ca_id/.test(error.message);
+      if (!colunaFaltando || semColunaEvento) throw new Error(`gravar ca_vendas: ${error.message}`);
+      semColunaEvento = true;
+      const retry = await supabaseAdmin.from("ca_vendas").upsert(semCampo(lote), { onConflict: "ca_id" });
+      if (retry.error) throw new Error(`gravar ca_vendas: ${retry.error.message}`);
+      console.warn("ca_vendas.categoria_evento_ca_id ausente: rodar supabase/ca-05-categoria-evento.sql");
+    }
   }
   for (let i = 0; i < itens.length; i += 500) {
     const { error } = await supabaseAdmin
@@ -172,7 +214,13 @@ export async function gravarEspelho(
    * A regra vive em `./categoriaReceita.ts`.
    */
   const categorias = (categoriasRaw as Record<string, unknown>[])
-    .filter((c) => txt(c?.ca_id) && (usadas.has(txt(c.ca_id)!) || ehCategoriaDeReceita(txt(c.codigo), txt(c.nome))))
+    .filter(
+      (c) =>
+        txt(c?.ca_id) &&
+        (usadas.has(txt(c.ca_id)!) ||
+          // `tipo`/`grupo_dre` só vêm do Jarvis novo; sem eles a regra cai no código.
+          ehCategoriaDeReceita(txt(c.codigo), txt(c.nome), txt(c.tipo), txt(c.grupo_dre))),
+    )
     .map((c) => ({
       ca_tipo: "categoria" as const,
       ca_id: txt(c.ca_id)!,
@@ -194,5 +242,11 @@ export async function gravarEspelho(
     /* fora de rota: nada a invalidar */
   }
 
-  return { vendas: vendas.length, itens: itens.length, categorias: categorias.length, orfaosRemovidos };
+  return {
+    vendas: vendas.length,
+    itens: itens.length,
+    categorias: categorias.length,
+    orfaosRemovidos,
+    ...(semColunaEvento ? { colunaEventoAusente: true } : {}),
+  };
 }

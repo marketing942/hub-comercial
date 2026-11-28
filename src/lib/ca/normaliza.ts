@@ -117,6 +117,31 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
   const vendas = vendasRaw.filter((v) => situacaoConta(v.situacao));
   r.vendasConsideradas = vendas.length;
 
+  /**
+   * A categoria do EVENTO FINANCEIRO de cada venda, em leitura SEPARADA.
+   *
+   * Por que não junto do `select` acima: se a coluna ainda não existir (SQL
+   * `ca-05-categoria-evento.sql` por rodar), um `select` que a inclua falha e
+   * derruba a normalização inteira. Aqui, se faltar, o mapa fica vazio e tudo se
+   * comporta como antes.
+   *
+   * ⚠️ Vale SÓ para a receita por categoria (Gestão à Vista). `sales` — meta e
+   * comissão — continua saindo de `categoria_ca_id`, a categoria da VENDA: as 247
+   * vendas cujo recebível diz EVENTOS CPPEM e cuja venda diz TURMAS PRESENCIAIS
+   * mudariam de crédito se os dois caminhos trocassem juntos. Ver `./recebido.ts`.
+   */
+  const categoriaDoEvento = new Map<string, string>();
+  try {
+    const comEvento = await lerTudo<{ ca_id: string; categoria_evento_ca_id: string | null }>(
+      "ca_vendas",
+      "ca_id, categoria_evento_ca_id",
+      { filtrar: (q) => (q as never as { gte: Function }).gte("data", de).lte("data", ate) },
+    );
+    for (const v of comEvento) if (v.categoria_evento_ca_id) categoriaDoEvento.set(v.ca_id, v.categoria_evento_ca_id);
+  } catch {
+    /* coluna ainda não criada: segue com a categoria da venda */
+  }
+
   const vendaIds = vendas.map((v) => v.ca_id as string);
   const itensRaw = await lerPorChaves<Record<string, unknown>>(
     "ca_venda_itens",
@@ -255,7 +280,12 @@ export async function normalizarJanela(de: string, ate: string): Promise<Resulta
       // Hub. BU e "conta p/ vendedor" saem da categoria (mapa, ou o palpite pelo
       // nome enquanto ninguem classificou); item classificado a mao manda.
       {
-        const catId = (v.categoria_ca_id as string | null) ?? (it.item_ca_id ? categoriaDoItem.get(it.item_ca_id) ?? null : null);
+        // A do EVENTO primeiro: é por ela que o DRE e o Faturamento do Jarvis
+        // dividem a receita, e é esta linha que alimenta a Gestão à Vista.
+        const catId =
+          categoriaDoEvento.get(v.ca_id as string) ??
+          (v.categoria_ca_id as string | null) ??
+          (it.item_ca_id ? categoriaDoItem.get(it.item_ca_id) ?? null : null);
         const catMapa2 = catId ? mapaCategoria.get(catId) : undefined;
         const itMapa2 = it.item_ca_id ? mapaItem.get(it.item_ca_id) : undefined;
         const nome = catMapa2?.nome || (catId ? `Categoria ${catId.slice(0, 8)}` : "Sem categoria no Conta Azul");

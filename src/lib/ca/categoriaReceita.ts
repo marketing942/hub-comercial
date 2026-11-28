@@ -1,15 +1,44 @@
 /**
  * Regras sobre as categorias do Conta Azul que o Jarvis manda (puro, sem banco).
  *
- * O Jarvis envia o cadastro inteiro (receita E despesa) sem dizer qual e qual.
- * No plano de contas da empresa so a receita e numerada ("1.0 - ...", "2.4 - ...");
- * despesa nao tem codigo.
+ * O Jarvis envia o cadastro inteiro (receita E despesa). Desde 28/11/2026 ele diz
+ * QUAL E QUAL (`tipo` + `grupo_dre`); antes nao dizia, e a regra tinha de sair do
+ * codigo — no plano de contas da empresa so a receita e numerada.
  */
 
 /** Numeradas que nao sao receita de venda: nao entram na fila de classificacao. */
 const NAO_E_VENDA = /a identificar|rendimento|empr[eé]stimo/i;
 
-export function ehCategoriaDeReceita(codigo: string | null, nome: string | null): boolean {
+/**
+ * Esta categoria entra na fila de classificacao (= e receita de faturamento)?
+ *
+ * ## Quando o Jarvis manda `tipo`, ele decide
+ *
+ * `tipo = 'receita'` + `grupo_dre = '01'` (Faturamento Bruto do DRE) e a mesma
+ * conta da aba Faturamento do Jarvis, e acerta o que a heuristica de codigo nao
+ * alcanca: **EVENTOS CPPEM e REMATRICULA COLEGIO nao tem codigo nenhum** no
+ * cadastro (o codigo sai do prefixo do nome, e esses nomes nao tem prefixo),
+ * entao caiam fora por `cod = ""`. Grupo 01 tambem e o que exclui as receitas
+ * FINANCEIRAS (grupo 06: emprestimo, rendimento, sublocacao, venda de ativo) sem
+ * depender de casar palavra no nome. Grupo vazio conta: categoria nova que ainda
+ * nao entrou no DRE do Conta Azul.
+ *
+ * ## Sem `tipo`, vale a heuristica de antes
+ *
+ * Enquanto o Jarvis que esta no ar for mais antigo, `tipo` vem `undefined` e o
+ * comportamento e exatamente o que era — nao da para o Hub depender de um deploy
+ * do outro lado para continuar funcionando.
+ */
+export function ehCategoriaDeReceita(
+  codigo: string | null,
+  nome: string | null,
+  tipo?: string | null,
+  grupoDre?: string | null,
+): boolean {
+  if (tipo) {
+    if (tipo !== "receita") return false;
+    return !grupoDre || grupoDre === "01";
+  }
   const n = nome ?? "";
   if (NAO_E_VENDA.test(n)) return false;
   const cod = codigo || n.match(/^\s*(\d+\.\d+)\s*-/)?.[1] || "";
